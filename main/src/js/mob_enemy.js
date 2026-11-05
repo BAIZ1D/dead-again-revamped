@@ -204,7 +204,8 @@ class Enemy extends Mob {
 					// D-08: Audience Mini-Boss does NOT end the level or wipe other enemies!
 					g_score += 4; // +4 here + 1 below = +5 bonus score
 					let gunTile = g_player && g_player.gun ? g_player.gun.tileIndex : tileNumbers_pistol;
-					new AmmoBox(this.pos.copy(), gunTile, this.twitchUser, false);
+					// D-05: Mini-boss drops Full Care Package (isFullPackage = true)
+					new AmmoBox(this.pos.copy(), gunTile, this.twitchUser, false, true);
 					if (typeof g_apgManager !== "undefined" && g_apgManager) {
 						g_apgManager.onEnemyKilled(this);
 					}
@@ -221,7 +222,7 @@ class Enemy extends Mob {
 					levelCleared = true;
 				}
 			} else {
-				// Regular enemy kill ammo drop logic (BAL-12)
+				// Regular enemy kill ammo drop logic (BAL-15, D-01, D-02, D-03, D-17)
 				let gunTile = g_player && g_player.gun ? g_player.gun.tileIndex : tileNumbers_pistol;
 				let reserve = 0;
 				if (g_player) {
@@ -229,9 +230,27 @@ class Enemy extends Mob {
 					else if (gunTile === tileNumbers_rifle) reserve = g_player.ammoRifle;
 					else reserve = g_player.ammoBullets;
 				}
-				let isLowAmmo = g_player && reserve < (gunTile === tileNumbers_shotgun ? 2 : gunTile === tileNumbers_rifle ? 2 : 6);
-				let shouldDrop = !(this instanceof BossZombie) && (isLowAmmo || rand() < 0.20);
+
+				// D-01, D-02: Clutch thresholds: <3 bullets for Pistol/SMG, <2 shells/rifle
+				let clutchThreshold = (gunTile === tileNumbers_shotgun ? 2 : gunTile === tileNumbers_rifle ? 2 : 3);
+				let isLowAmmo = g_player && reserve < clutchThreshold;
+
+				// D-03: 60-frame (1.0s) throttle prevents simultaneous drops from multi-kills
+				let nowFrame = typeof frame !== "undefined" ? frame : 0;
+				Enemy.lastClutchDropFrame = Enemy.lastClutchDropFrame || -999;
+				let isClutch = isLowAmmo && (nowFrame - Enemy.lastClutchDropFrame >= 60);
+
+				// D-17: Tiered base kill drop rates by mob lethality (averaging ~7%)
+				let dropRate = 0.07;
+				if (this instanceof Zombie) dropRate = 0.05;
+				else if (this instanceof Vampire) dropRate = 0.10;
+				else if (this instanceof Ghost) dropRate = 0.12;
+
+				let shouldDrop = !(this instanceof BossZombie) && (isClutch || rand() < dropRate);
 				if (shouldDrop) {
+					if (isClutch) {
+						Enemy.lastClutchDropFrame = nowFrame;
+					}
 					new AmmoBox(this.pos.copy(), gunTile, null, true);
 					if (typeof soundPickup !== "undefined" && soundPickup) {
 						soundPickup.play(this.pos, 0.3, 2);
