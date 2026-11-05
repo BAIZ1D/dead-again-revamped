@@ -792,10 +792,15 @@ const tileNumbers_boxRifleAmmo = 23;
 const tileNumbers_floorStone = 12;
 const tileNumbers_door = 11;
 
-// Reserve Ammo Caps (BAL-10)
+// Reserve Ammo Caps (BAL-10, BAL-21, D-09)
 const MAX_AMMO_BULLETS = 36;
-const MAX_AMMO_SHELLS = 12;
+const MAX_AMMO_SHELLS = 8; // Lowered from 12 to 8 (D-09)
 const MAX_AMMO_RIFLE = 8;
+
+// Level Transition Opening Reserve Caps (BAL-21, D-18)
+const LEVEL_TRANSITION_MAX_BULLETS = 18;
+const LEVEL_TRANSITION_MAX_SHELLS = 4;
+const LEVEL_TRANSITION_MAX_RIFLE = 3;
 
 let g_player = null;
 var g_savedEquipment = null;
