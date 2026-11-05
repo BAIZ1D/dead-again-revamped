@@ -1,0 +1,233 @@
+/* ==========================================================================
+   DEAD AGAIN: TWITCH APG - STREAMER DASHBOARD UPDATE & MONETIZATION STYLES
+   Phase 09: Packaging & Distribution Pipeline (PKG-05, PKG-07)
+   ========================================================================== */
+
+.hidden {
+  display: none !important;
+}
+
+/* Update Notification Pill (PKG-07, D-09) */
+.update-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(255, 170, 0, 0.25), rgba(145, 70, 255, 0.3));
+  border: 1px solid #ffaa00;
+  box-shadow: 0 0 12px rgba(255, 170, 0, 0.45);
+  color: #ffcc00;
+  font-size: 0.82rem;
+  font-weight: bold;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  animation: pulse-update-pill 2s infinite ease-in-out;
+  transition: all 0.2s ease;
+}
+
+.update-pill:hover {
+  background: linear-gradient(135deg, rgba(255, 170, 0, 0.4), rgba(145, 70, 255, 0.45));
+  box-shadow: 0 0 18px rgba(255, 170, 0, 0.7);
+  transform: translateY(-1px);
+}
+
+@keyframes pulse-update-pill {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(255, 170, 0, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(145, 70, 255, 0.65), 0 0 8px rgba(255, 170, 0, 0.6);
+  }
+}
+
+.pill-dismiss {
+  background: transparent;
+  border: none;
+  color: #ffaa00;
+  font-size: 1.1rem;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  margin-left: 4px;
+  opacity: 0.8;
+  transition: opacity 0.15s ease;
+}
+
+.pill-dismiss:hover {
+  opacity: 1;
+  color: #ff3355;
+}
+
+/* Header Monetization & Links (PKG-05, D-26) */
+.header-btn {
+  font-size: 0.8rem;
+  font-weight: bold;
+  padding: 6px 12px;
+  border-radius: 3px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.kofi-btn {
+  background: #FF5E5B;
+  color: #ffffff !important;
+  border: 1px solid #ff7a77;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.kofi-btn:hover {
+  background: #ff7572;
+  box-shadow: 0 0 12px rgba(255, 94, 91, 0.6);
+  transform: translateY(-1px);
+}
+
+.itch-btn {
+  background: #FA5C5C;
+  color: #ffffff !important;
+  border: 1px solid #fc7b7b;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.itch-btn:hover {
+  background: #fb7272;
+  box-shadow: 0 0 12px rgba(250, 92, 92, 0.6);
+  transform: translateY(-1px);
+}
+
+.github-btn {
+  background: #9146FF;
+  color: #ffffff !important;
+  border: 1px solid #aa6eff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.github-btn:hover {
+  background: #9f5eff;
+  box-shadow: 0 0 12px rgba(145, 70, 255, 0.6);
+  transform: translateY(-1px);
+}
+
+/* In-App Release Card Modal (PKG-07, D-10) */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 5, 8, 0.85);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.modal-card {
+  background: #131822;
+  border: 2px solid #9146FF;
+  box-shadow: 0 0 30px rgba(145, 70, 255, 0.4), inset 0 0 15px rgba(0, 0, 0, 0.6);
+  border-radius: 6px;
+  width: 100%;
+  max-width: 560px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  background: #090c10;
+  border-bottom: 2px solid #263042;
+}
+
+.modal-header h3 {
+  font-size: 1.05rem;
+  letter-spacing: 1px;
+  color: #ffaa00;
+  text-shadow: 0 0 8px rgba(255, 170, 0, 0.5);
+  margin: 0;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: #8b9bb4;
+  font-size: 1.4rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 6px;
+  transition: color 0.15s ease;
+}
+
+.close-btn:hover {
+  color: #ff3355;
+}
+
+.modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+#modal-version-text {
+  font-size: 0.95rem;
+  font-weight: bold;
+  color: #00ff66;
+  text-shadow: 0 0 6px rgba(0, 255, 102, 0.4);
+}
+
+.changelog-box {
+  background: #090c10;
+  border: 1px solid #263042;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.7);
+  border-radius: 4px;
+  padding: 12px 14px;
+  font-family: 'Courier New', Courier, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #e4ecf5;
+  max-height: 180px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.action-btn {
+  flex: 1 1 calc(33.333% - 10px);
+  min-width: 130px;
+  padding: 10px 14px;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  font-weight: bold;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+/* Footer Attribution (D-25) */
+.dashboard-footer {
+  margin-top: 24px;
+  padding: 14px 20px;
+  text-align: center;
+  border-top: 1px solid #263042;
+}
+
+.footer-attribution {
+  font-size: 0.75rem;
+  color: #8b9bb4;
+  letter-spacing: 0.5px;
+}

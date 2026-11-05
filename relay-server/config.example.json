@@ -1,0 +1,14 @@
+{
+  "channel": "",
+  "port": 8080,
+  "predictionDurationSec": 60,
+  "twitchClientId": "",
+  "twitchClientSecret": "",
+  "twitchAccessToken": "",
+  "isMock": false,
+  "rateLimits": {
+    "baseCooldownMs": 3000,
+    "bossCooldownMs": 8000,
+    "userThrottleMs": 2000
+  }
+}

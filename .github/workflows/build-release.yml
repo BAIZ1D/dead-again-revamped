@@ -1,0 +1,113 @@
+name: Build & Draft Desktop Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v1.2.0)'
+        required: false
+        default: 'v1.2.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }} Package
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: mac
+            build_cmd: npm run pack:mac
+          - os: windows-latest
+            target: win
+            build_cmd: npm run pack:win
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Concatenate LittleJS Game Files
+        run: node scripts/build-game.js
+
+      - name: Generate Multi-Platform Application Icons
+        run: node scripts/generate-icons.js
+
+      - name: Build Electron Release Package
+        run: ${{ matrix.build_cmd }}
+
+      - name: Copy Gatekeeper Helper for Release
+        if: matrix.target == 'mac'
+        run: cp "desktop/assets/Fix Gatekeeper.command" release/
+
+      - name: Upload Release Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-packages-${{ matrix.target }}
+          path: release/*.*
+          if-no-files-found: error
+
+  draft-release:
+    name: Create Draft GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - name: Download Built Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded-artifacts
+
+      - name: Clean up existing release for tag
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = '${{ github.event.inputs.tag_name || github.ref_name }}';
+            try {
+              const { data: release } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: tag
+              });
+              if (release) {
+                console.log(`Deleting existing release ${release.id} for tag ${tag}`);
+                await github.rest.repos.deleteRelease({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: release.id
+                });
+              }
+            } catch (err) {
+              console.log('No existing release found for tag:', err.message);
+            }
+
+      - name: Publish Draft Release on GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            downloaded-artifacts/**/*.dmg
+            downloaded-artifacts/**/*.exe
+            downloaded-artifacts/**/*.zip
+            downloaded-artifacts/**/*.command

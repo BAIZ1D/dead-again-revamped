@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DEAD AGAIN - REVAMPED (TWITCH EDITION) - STREAMER DASHBOARD</title>
+  <link rel="stylesheet" href="/dashboard/css/style.css" />
+  <link rel="stylesheet" href="/dashboard/css/dashboard.css" />
+</head>
+<body class="crt-scanlines">
+  <div class="dashboard-wrapper">
+    <!-- HEADER -->
+    <header class="arcade-header">
+      <div class="header-title-block">
+        <h1>DEAD AGAIN - REVAMPED (TWITCH EDITION)</h1>
+        <p class="subtitle">STREAMER COMPANION DASHBOARD &amp; AUDIENCE PARTICIPATION CONTROL</p>
+      </div>
+      <div class="header-status-block">
+        <div id="update-notification-pill" class="update-pill hidden">★ UPDATE AVAILABLE: <span id="update-pill-version"></span> ★ <button id="update-pill-dismiss" class="pill-dismiss">×</button></div>
+        <span id="ws-status-badge" class="status-badge disconnected">● DISCONNECTED</span>
+        <span id="channel-badge" class="meta-badge">CHANNEL: #none</span>
+        <span id="viewer-badge" class="meta-badge">VIEWERS: 0</span>
+        <a id="kofi-header-btn" class="header-btn kofi-btn" href="https://ko-fi.com/baiz1d" target="_blank" rel="noopener">☕ Ko-fi</a>
+        <a id="itch-header-btn" class="header-btn itch-btn" href="https://baiz1d.itch.io/dead-again-revamped" target="_blank" rel="noopener">★ Itch.io</a>
+        <a href="/" target="_blank" rel="noopener" class="btn btn-launch">▶ LAUNCH GAME (/)</a>
+      </div>
+    </header>
+
+    <main class="dashboard-grid">
+      <!-- SECTION 1: CHANNEL SETUP -->
+      <section class="card panel-setup">
+        <div class="card-header">
+          <h2>01 // TWITCH CHANNEL SETUP</h2>
+          <span id="auth-mode-indicator" class="mode-pill">Anonymous IRC Mode (Zero setup required)</span>
+        </div>
+        <form id="channel-config-form" class="setup-form">
+          <div class="form-group">
+            <label for="channel-input">TWITCH CHANNEL NAME</label>
+            <div class="input-row">
+              <span class="input-prefix">twitch.tv/</span>
+              <input
+                type="text"
+                id="channel-input"
+                name="channel"
+                placeholder="e.g. baiz1d or mock"
+                autocomplete="off"
+              />
+            </div>
+            <small class="help-text">Enter any Twitch username to immediately ingest live chat commands &amp; votes.</small>
+          </div>
+
+          <details class="oauth-collapsible">
+            <summary>Optional: Twitch Helix OAuth (Channel Point Predictions &amp; Live Viewer Count)</summary>
+            <div class="oauth-fields">
+              <div class="form-group">
+                <label for="client-id-input">TWITCH CLIENT ID</label>
+                <input type="text" id="client-id-input" placeholder="Optional Client ID" autocomplete="off" />
+              </div>
+              <div class="form-group">
+                <label for="client-secret-input">TWITCH CLIENT SECRET</label>
+                <input type="password" id="client-secret-input" placeholder="Optional Client Secret" autocomplete="off" />
+              </div>
+              <div class="form-group">
+                <label for="access-token-input">BROADCASTER OAUTH ACCESS TOKEN</label>
+                <input type="password" id="access-token-input" placeholder="Optional OAuth Token" autocomplete="off" />
+              </div>
+            </div>
+          </details>
+
+          <div class="form-actions">
+            <button type="submit" id="save-config-btn" class="btn btn-primary">SAVE &amp; CONNECT</button>
+            <span id="save-feedback" class="save-feedback"></span>
+          </div>
+        </form>
+      </section>
+
+      <!-- SECTION 2: PRE-GAME PREDICTION & FACTION LOCK -->
+      <section class="card panel-prediction">
+        <div class="card-header">
+          <h2>02 // PRE-GAME PREDICTION &amp; FACTION LOCK</h2>
+          <span id="prediction-status-pill" class="mode-pill">IDLE</span>
+        </div>
+
+        <div class="prediction-controls">
+          <div class="prediction-timer-row">
+            <div class="prediction-level-block">
+              <span id="prediction-level-label" class="prediction-level-badge">LEVEL 1</span>
+              <span class="prediction-question">"Will Chat be GOOD or BAD this run?"</span>
+            </div>
+            <div id="prediction-timer-display" class="prediction-timer">01:00</div>
+          </div>
+
+          <div class="prediction-tug-wrapper">
+            <div class="prediction-tug-labels">
+              <span id="prediction-good-label" class="tug-label-good">GOOD 50% (0)</span>
+              <span id="prediction-bad-label" class="tug-label-bad">BAD 50% (0)</span>
+            </div>
+            <div class="prediction-tug-bar">
+              <div id="prediction-good-bar" class="tug-fill-good" style="width: 50%"></div>
+              <div id="prediction-bad-bar" class="tug-fill-bad" style="width: 50%"></div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="section-label">COUNTDOWN DURATION PRESET (PERSISTED)</label>
+            <div class="duration-group" role="group" aria-label="Prediction Duration Presets">
+              <button type="button" class="btn btn-duration" data-duration="15">15s</button>
+              <button type="button" class="btn btn-duration" data-duration="30">30s</button>
+              <button type="button" class="btn btn-duration active" data-duration="60">60s</button>
+              <button type="button" class="btn btn-duration" data-duration="120">120s</button>
+            </div>
+          </div>
+
+          <div class="prediction-action-row">
+            <button type="button" id="open-prediction-btn" class="btn btn-primary">
+              OPEN PREDICTION LOBBY
+            </button>
+            <button type="button" id="lock-prediction-btn" class="btn btn-secondary">
+              LOCK VOTES &amp; START NOW
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 3: MOCK DEV SIMULATOR & BOT SWARM -->
+      <section class="card panel-swarm">
+        <div class="card-header">
+          <h2>03 // MOCK DEV SIMULATOR &amp; BOT SWARM</h2>
+          <span id="swarm-status-pill" class="mode-pill">SWARM IDLE (0 BOTS)</span>
+        </div>
+
+        <div class="swarm-controls">
+          <label class="section-label">SELECT AUDIENCE / STREAM PRESET</label>
+          <div class="preset-group" role="group" aria-label="Bot Swarm Presets">
+            <button type="button" class="btn btn-preset" data-preset="solo">
+              Solo Test (1 Bot)
+            </button>
+            <button type="button" class="btn btn-preset active" data-preset="class">
+              Audience Match (25 Bots)
+            </button>
+            <button type="button" class="btn btn-preset" data-preset="chaos">
+              Chaos Swarm (50 Bots)
+            </button>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-header">
+              <label for="swarm-rate-slider">CHATTER RATE SLIDER</label>
+              <span id="swarm-rate-display" class="rate-value">3 actions/sec</span>
+            </div>
+            <input
+              type="range"
+              id="swarm-rate-slider"
+              min="1"
+              max="20"
+              value="3"
+              step="1"
+            />
+          </div>
+
+          <button type="button" id="swarm-toggle-btn" class="btn btn-swarm-toggle">
+            START BOT SWARM
+          </button>
+
+          <!-- Fake Chat Box for Custom Command Testing -->
+          <div class="fake-chat-box">
+            <label for="fake-chat-input">SIMULATE SINGLE CHAT MESSAGE</label>
+            <div class="input-row">
+              <input
+                type="text"
+                id="fake-chat-user"
+                class="chat-user-input"
+                value="Audience_1"
+                placeholder="Username"
+              />
+              <input
+                type="text"
+                id="fake-chat-input"
+                placeholder="Type !ammo, !boss, !good, !bad, !vote good..."
+              />
+              <button type="button" id="fake-chat-send" class="btn btn-secondary">SEND</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 4: MANUAL ACTION TRIGGER PADS -->
+      <section class="card panel-triggers">
+        <div class="card-header">
+          <h2>04 // MANUAL ACTION TRIGGER PADS</h2>
+          <span class="mode-pill">INSTANT WEBSOCKET DISPATCH (BYPASSES CHARGE)</span>
+        </div>
+
+        <div class="live-karma-box">
+          <div class="live-karma-header">
+            <span id="live-karma-good-label" class="tug-label-good">LIVE GOOD: 50% (0)</span>
+            <span id="live-karma-target-label" class="karma-target-pill">TARGET: 50% GOOD | ▲ GOOD LEADING</span>
+            <span id="live-karma-bad-label" class="tug-label-bad">LIVE BAD: 50% (0)</span>
+          </div>
+          <div class="live-karma-bar">
+            <div id="live-karma-good-fill" class="tug-fill-good" style="width: 50%"></div>
+            <div id="live-karma-bad-fill" class="tug-fill-bad" style="width: 50%"></div>
+            <div id="live-karma-target-pin" class="karma-target-pin" style="left: 50%" title="Locked Prediction Target"></div>
+          </div>
+        </div>
+
+        <div class="trigger-columns">
+          <!-- COLUMN 1: TEAM GOOD -->
+          <div class="team-column team-good">
+            <h3 class="team-heading good-heading">▲ TEAM GOOD (BUFFS)</h3>
+            <div class="pad-grid">
+              <button type="button" class="trigger-pad pad-good" data-action="ammo" data-team="good">
+                <div class="pad-header">
+                  <span class="pad-cmd">!ammo</span>
+                  <span class="pad-charge" data-charge-badge="ammo">0/1</span>
+                </div>
+                <span class="pad-desc">Care Package</span>
+              </button>
+              <button type="button" class="trigger-pad pad-good" data-action="repair" data-team="good">
+                <div class="pad-header">
+                  <span class="pad-cmd">!repair</span>
+                  <span class="pad-charge" data-charge-badge="repair">0/1</span>
+                </div>
+                <span class="pad-desc">Door Reinforce</span>
+              </button>
+              <button type="button" class="trigger-pad pad-good" data-action="light" data-team="good">
+                <div class="pad-header">
+                  <span class="pad-cmd">!light</span>
+                  <span class="pad-charge" data-charge-badge="light">0/1</span>
+                </div>
+                <span class="pad-desc">Flashlight Flare</span>
+              </button>
+              <button type="button" class="trigger-pad pad-good" data-action="slow" data-team="good">
+                <div class="pad-header">
+                  <span class="pad-cmd">!slow</span>
+                  <span class="pad-charge" data-charge-badge="slow">0/1</span>
+                </div>
+                <span class="pad-desc">Zombies Slowed</span>
+              </button>
+              <button type="button" class="trigger-pad pad-good" data-action="barrier" data-team="good">
+                <div class="pad-header">
+                  <span class="pad-cmd">!barrier</span>
+                  <span class="pad-charge" data-charge-badge="barrier">0/1</span>
+                </div>
+                <span class="pad-desc">Push Barrier</span>
+              </button>
+              <button type="button" class="trigger-pad pad-good pad-vote" data-action="vote_good" data-team="good" data-type="VOTE">
+                <span class="pad-cmd">!vote good</span>
+                <span class="pad-desc">Simulate Vote</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- COLUMN 2: TEAM BAD -->
+          <div class="team-column team-bad">
+            <h3 class="team-heading bad-heading">▼ TEAM BAD (SABOTAGES)</h3>
+            <div class="pad-grid">
+              <button type="button" class="trigger-pad pad-bad" data-action="mob" data-team="bad">
+                <div class="pad-header">
+                  <span class="pad-cmd">!mob</span>
+                  <span class="pad-charge" data-charge-badge="mob">0/1</span>
+                </div>
+                <span class="pad-desc">Swarm Wave</span>
+              </button>
+              <button type="button" class="trigger-pad pad-bad" data-action="boss" data-team="bad">
+                <div class="pad-header">
+                  <span class="pad-cmd">!boss</span>
+                  <span class="pad-charge" data-charge-badge="boss">0/1</span>
+                </div>
+                <span class="pad-desc">Elite Zombie</span>
+              </button>
+              <button type="button" class="trigger-pad pad-bad" data-action="blackout" data-team="bad">
+                <div class="pad-header">
+                  <span class="pad-cmd">!blackout</span>
+                  <span class="pad-charge" data-charge-badge="blackout">0/1</span>
+                </div>
+                <span class="pad-desc">Room Blackout</span>
+              </button>
+              <button type="button" class="trigger-pad pad-bad" data-action="jam" data-team="bad">
+                <div class="pad-header">
+                  <span class="pad-cmd">!jam</span>
+                  <span class="pad-charge" data-charge-badge="jam">0/1</span>
+                </div>
+                <span class="pad-desc">Weapon Jam</span>
+              </button>
+              <button type="button" class="trigger-pad pad-bad" data-action="frenzy" data-team="bad">
+                <div class="pad-header">
+                  <span class="pad-cmd">!frenzy</span>
+                  <span class="pad-charge" data-charge-badge="frenzy">0/1</span>
+                </div>
+                <span class="pad-desc">Zombie Frenzy</span>
+              </button>
+              <button type="button" class="trigger-pad pad-bad pad-vote" data-action="vote_bad" data-team="bad" data-type="VOTE">
+                <span class="pad-cmd">!vote bad</span>
+                <span class="pad-desc">Simulate Vote</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="divine-flash-demo-row">
+          <button type="button" id="divine-flash-demo-btn" class="btn btn-divine-flash">
+            ⚡ TRIGGER DIVINE FLASH (CLUTCH SURVIVAL DEMO)
+          </button>
+        </div>
+      </section>
+
+      <!-- SECTION 5: REAL-TIME EVENT LOG -->
+      <section class="card panel-log">
+        <div class="card-header">
+          <h2>05 // REAL-TIME EVENT LOG</h2>
+          <button type="button" id="clear-log-btn" class="btn btn-small">CLEAR LOG</button>
+        </div>
+        <div id="event-log-container" class="terminal-log" aria-live="polite">
+          <div class="log-entry log-system">
+            <span class="log-time">[BOOT]</span>
+            <span class="log-msg">Waiting for APG WebSocket telemetry stream...</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 06: MATCH OUTCOME & RESOLUTION -->
+      <section class="card panel-outcome" id="panel-outcome">
+        <div class="card-header">
+          <h2>06 // MATCH OUTCOME &amp; RESOLUTION</h2>
+          <span id="outcome-status-pill" class="mode-pill">AWAITING LEVEL CONCLUSION</span>
+        </div>
+
+        <div class="outcome-content-box">
+          <div class="outcome-banner-row">
+            <div id="outcome-winner-badge" class="outcome-winner-badge winner-none">
+              NO RECENT OUTCOME
+            </div>
+            <div id="outcome-multiplier-badge" class="outcome-multiplier-badge">
+              PAYOUT: 1:1.0x
+            </div>
+          </div>
+
+          <div class="outcome-details-grid">
+            <div class="outcome-detail-item">
+              <span class="detail-label">LEVEL / REASON</span>
+              <span id="outcome-level-reason" class="detail-val">Level 1 - In Progress</span>
+            </div>
+            <div class="outcome-detail-item">
+              <span class="detail-label">FINAL KARMA VS TARGET</span>
+              <span id="outcome-karma-vs-target" class="detail-val">50% Good vs 50% Target</span>
+            </div>
+            <div class="outcome-detail-item">
+              <span class="detail-label">GUARDIAN ANGEL MVP</span>
+              <span id="outcome-mvp-good" class="detail-val text-good">None</span>
+            </div>
+            <div class="outcome-detail-item">
+              <span class="detail-label">PUBLIC ENEMY #1</span>
+              <span id="outcome-mvp-bad" class="detail-val text-bad">None</span>
+            </div>
+          </div>
+
+          <div class="manual-override-block">
+            <span class="section-label">MANUAL RESOLUTION OVERRIDES (TESTING &amp; LIVE RECOVERY)</span>
+            <div class="override-btn-group">
+              <button type="button" id="force-resolve-good-btn" class="btn btn-force-good">
+                FORCE RESOLVE: TEAM GOOD
+              </button>
+              <button type="button" id="force-resolve-bad-btn" class="btn btn-force-bad">
+                FORCE RESOLVE: TEAM BAD
+              </button>
+              <button type="button" id="force-refund-btn" class="btn btn-force-refund">
+                FORCE REFUND (PUSH)
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="dashboard-footer">
+      <div class="footer-attribution">Dead Again - Revamped (Twitch Edition) • Developed by Baizid Al Hamid</div>
+    </footer>
+  </div>
+
+  <!-- IN-APP RELEASE CARD MODAL -->
+  <div id="update-modal" class="modal-backdrop hidden">
+    <div class="modal-card retro-panel">
+      <div class="modal-header">
+        <h3>★ NEW UPDATE DETECTED ★</h3>
+        <button id="modal-close-btn" class="close-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <p id="modal-version-text"></p>
+        <div id="modal-changelog-box" class="changelog-box"></div>
+        <div class="modal-actions">
+          <button id="btn-download-github" class="action-btn github-btn">Download on GitHub</button>
+          <button id="btn-view-itch" class="action-btn itch-btn">View on Itch.io</button>
+          <button id="btn-support-kofi" class="action-btn kofi-btn">☕ Support on Ko-fi</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/dashboard/js/dashboard.js"></script>
+</body>
+</html>

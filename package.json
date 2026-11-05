@@ -1,0 +1,40 @@
+{
+  "name": "dead-again-revamped",
+  "version": "1.0.0",
+  "description": "Dead Again - Revamped (Twitch Edition)",
+  "author": "Baizid Al Hamid",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BAIZ1D/dead-again-revamped.git"
+  },
+  "type": "module",
+  "main": "desktop/main.js",
+  "scripts": {
+    "start": "node scripts/build-game.js && node relay-server/src/index.js",
+    "build": "node scripts/build-game.js",
+    "relay": "node relay-server/src/index.js",
+    "generate-icons": "node scripts/generate-icons.js",
+    "dev:desktop": "node scripts/build-game.js && electron desktop/main.js",
+    "start:desktop": "node scripts/build-game.js && electron desktop/main.js",
+    "pack:mac": "node scripts/build-game.js && node scripts/generate-icons.js && electron-builder --mac --universal --publish never",
+    "pack:win": "node scripts/build-game.js && node scripts/generate-icons.js && electron-builder --win --x64 --publish never",
+    "dist": "node scripts/build-game.js && node scripts/generate-icons.js && electron-builder --publish never",
+    "test:packaging": "node scripts/test-phase9-packaging.js",
+    "test:distribution": "node scripts/test-phase9-distribution.js"
+  },
+  "dependencies": {
+    "@twurple/api": "^7.2.3",
+    "@twurple/auth": "^7.2.3",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "tmi.js": "^1.8.5",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^26.18.0",
+    "electron-store": "^8.2.0",
+    "png2icons": "^2.0.1"
+  }
+}

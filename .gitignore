@@ -1,0 +1,12 @@
+.planning/
+node_modules/
+.DS_Store
+relay-server/config.json
+dist/js/index.js
+main/dist/js/index.js
+main/src/js/start_GEN.js
+!relay-server/config.example.json
+test-tmp/
+GEMINI.md
+release/
+*.log

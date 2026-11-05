@@ -1,0 +1,80 @@
+appId: com.baiz1d.deadagain-revamped
+productName: Dead Again - Revamped (Twitch Edition)
+
+directories:
+  output: release
+  buildResources: desktop/assets
+
+files:
+  - desktop/**/*
+  - relay-server/src/**/*
+  - relay-server/public/**/*
+  - relay-server/config.example.json
+  - main/dist/**/*
+  - LICENSE-THIRD-PARTY.txt
+  - package.json
+  - "!**/node_modules/*/{CHANGELOG.md,README.md,test,tests,example,examples}"
+  - "!scripts/**/*"
+  - "!main/src/**/*"
+  - "!.planning/**/*"
+  - "!*.log"
+
+publish: null
+
+asar: true
+asarUnpack:
+  - relay-server/public/**/*
+  - main/dist/**/*
+
+afterPack: scripts/after-pack.cjs
+
+mac:
+  category: public.app-category.games
+  icon: desktop/assets/icon.icns
+  target:
+    - target: dmg
+      arch:
+        - universal
+    - target: zip
+      arch:
+        - universal
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  identity: null
+
+dmg:
+  title: Dead Again - Revamped (Twitch Edition)
+  background: desktop/assets/dmg-background.png
+  window:
+    width: 540
+    height: 380
+  contents:
+    - x: 140
+      y: 190
+      type: file
+    - x: 400
+      y: 190
+      type: link
+      path: /Applications
+
+win:
+  icon: desktop/assets/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Dead Again - Revamped
+  installerIcon: desktop/assets/icon.ico
+  uninstallerIcon: desktop/assets/icon.ico
+  installerHeaderIcon: desktop/assets/icon.ico
+  installerHeader: desktop/assets/installer-header.bmp
