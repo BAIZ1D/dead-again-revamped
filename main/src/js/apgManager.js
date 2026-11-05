@@ -364,13 +364,26 @@ class APGManager {
 					typeof findFreePosRange === "function"
 						? findFreePosRange(1.8, 2.8, true)
 						: pos.add(vec2(0.6, 0));
+				let curLevel = typeof g_level !== "undefined" ? g_level : 0;
 				let r = rand();
-				if (r < 0.33) {
-					new Shotgun(upPos);
-				} else if (r < 0.66) {
-					new Rifle(upPos);
+
+				// BAL-21, D-07: Shotgun gatekeeping
+				if (curLevel < 2) {
+					// Levels 0-1: Shotguns disabled; 50% Rifle / 50% Machine Pistol
+					if (r < 0.50) {
+						new Rifle(upPos);
+					} else {
+						new MachinePistol(upPos);
+					}
 				} else {
-					new MachinePistol(upPos);
+					// Level 2+: 10% Shotgun / 45% Rifle / 45% Machine Pistol
+					if (r < 0.10) {
+						new Shotgun(upPos);
+					} else if (r < 0.55) {
+						new Rifle(upPos);
+					} else {
+						new MachinePistol(upPos);
+					}
 				}
 				this.addToast("[GOOD] @" + tag + " dropped Ammo + WEAPON UPGRADE!", "good");
 			} else {
