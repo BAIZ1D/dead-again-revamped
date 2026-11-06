@@ -4825,6 +4825,18 @@ class MobPlayer extends Mob {
 			if (this.invulnFrames === 0) this.divineInvuln = false;
 		}
 
+		// Continuous rhythmic heartbeat pulse (~1.2Hz / 50 frames) while at 1 HP (D-05)
+		if (this.hp === 1 && typeof g_state !== "undefined" && g_state === STATE_PLAYING && !g_isPaused) {
+			if (frame % 50 === 0 && typeof soundHeartbeat !== "undefined") {
+				soundHeartbeat.play(this.pos, 0.75, 1.0);
+				setTimeout(() => {
+					if (typeof soundHeartbeat !== "undefined" && typeof g_player !== "undefined" && g_player && g_player.hp === 1) {
+						soundHeartbeat.play(g_player.pos, 0.55, 0.88);
+					}
+				}, 140);
+			}
+		}
+
 		// !light grants +25% movement speed (D-04, BAL-08)
 		const baseSpeed = 0.0115;
 		const lightActive = typeof g_apgManager !== "undefined" && g_apgManager && g_apgManager.timers.light > 0;
@@ -4912,12 +4924,22 @@ class MobPlayer extends Mob {
 				fx_splatter(this.pos.copy());
 
 				if (this.hp > 0) {
-					// survived the hit: 1.5s i-frames + radial knockback (D-13)
-					this.invulnFrames = 90;
+					// survived the hit: 0.75s i-frames (45 frames) + radial knockback (D-01, D-02, D-06)
+					this.invulnFrames = 45;
 					this.divineInvuln = false;
 					pushers.push(new Pusher(this.pos.copy(), 0.08, 0.2, 2.2, 0.2, PushTo.ENEMIES));
 					if (typeof soundShieldBreak !== "undefined") soundShieldBreak.play(this.pos);
 					uiflashScreen("#ac3232", 6);
+
+					// Immediate double-thump heartbeat on dropping to 1 HP (D-05)
+					if (this.hp === 1 && typeof soundHeartbeat !== "undefined") {
+						soundHeartbeat.play(this.pos, 1.3, 1.0);
+						setTimeout(() => {
+							if (typeof soundHeartbeat !== "undefined" && typeof g_player !== "undefined" && g_player && g_player.hp === 1) {
+								soundHeartbeat.play(g_player.pos, 1.0, 0.88);
+							}
+						}, 140);
+					}
 				} else {
 					// WE DIE !
 					// Record fatal attacker metadata for Cause of Death attribution (D-17)
@@ -4945,12 +4967,12 @@ class MobPlayer extends Mob {
 	}
 
 	render() {
-		// invulnerability flash: gold for Divine Flash, ghostly blink for post-hit i-frames
+		// invulnerability flash: gold for Divine Flash (10Hz), red-ghost blink for post-hit i-frames (15Hz) (D-03, D-04)
 		if (this.invulnFrames > 0 && this.hp > 0) {
 			if (this.divineInvuln) {
 				this.color = frame % 6 < 3 ? colorSpark : colorWhite;
 			} else {
-				this.color = frame % 6 < 3 ? new Color(1, 1, 1, 0.35) : colorWhite;
+				this.color = frame % 4 < 2 ? new Color(1, 0.4, 0.4, 0.5) : colorWhite;
 			}
 		} else {
 			this.color = colorWhite;
