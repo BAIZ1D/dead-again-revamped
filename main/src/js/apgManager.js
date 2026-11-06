@@ -1618,17 +1618,74 @@ class APGManager {
 	renderCenterBanner(W, H, cx, u) {
 		if (!this.centerBanner || this.centerBanner.frames <= 0) return;
 
-		let bannerW = Math.min(W * 0.75, u * 30);
-		let bannerH = u * 2.6;
+		let hasSubtext = !!(this.centerBanner.subtext && this.centerBanner.subtext.length > 0);
+		// D-07: Dynamic container height: u * 2.4 single-line vs u * 3.4 dual-line
+		let bannerH = hasSubtext ? u * 3.4 : u * 2.4;
 		let bannerPos = vec2(cx, H * 0.22);
+
+		// D-08: Measure required text width with monospace metric (~0.60 * fontSize) + safe 2.4u padding
+		let baseHeadSize = u * 1.05;
+		let baseSubSize = u * 0.64;
+		let headText = this.centerBanner.text || "";
+		let subText = this.centerBanner.subtext || "";
+
+		let headW = headText.length * (baseHeadSize * 0.60);
+		let subW = hasSubtext ? subText.length * (baseSubSize * 0.60) : 0;
+		let reqContentW = Math.max(headW, subW);
+		let padX = u * 2.4;
+		let reqWidth = reqContentW + padX;
+
+		// Maximum banner width up to 92% screen width (D-08)
+		let maxBannerW = W * 0.92;
+		let bannerW = Math.min(maxBannerW, Math.max(u * 26, reqWidth));
+
+		// Responsive font downscaling for long text / long Twitch usernames exceeding maxBannerW
+		let fontScale = 1.0;
+		if (reqWidth > maxBannerW) {
+			fontScale = Math.min(1.0, (maxBannerW - padX) / Math.max(1, reqContentW));
+		}
+		let headSize = baseHeadSize * fontScale;
+		let subSize = baseSubSize * fontScale;
+
+		// D-09: Faction-reactive border styling (colorSpark vs colorBlood)
+		let isBad = (this.centerBanner.color === colorBlood ||
+			headText.includes("BLOOD SURGE") ||
+			headText.includes("⚠️"));
+		let baseBorderCol = isBad ? colorBlood : (this.centerBanner.color || colorSpark);
+
+		// D-10: Snappy arcade pulse & subtle shimmer
 		let bPulse = 1 + 0.05 * Math.sin(frame / 4);
+		let borderPulse = isBad
+			? 0.82 + 0.18 * Math.sin(frame / 4)
+			: 0.88 + 0.12 * Math.sin(frame / 3);
+		let activeBorderCol = baseBorderCol.scale(borderPulse);
 
-		uiDrawRectScreen(bannerPos, vec2(bannerW + 6, bannerH + 6), colorSpark);
-		uiDrawRectScreen(bannerPos, vec2(bannerW, bannerH), new Color(0.12, 0.02, 0.02, 0.92));
+		// Dark background plate tinted with subtle faction undertone
+		let bgCol = isBad
+			? new Color(0.14, 0.02, 0.02, 0.94)
+			: new Color(0.04, 0.05, 0.03, 0.94);
 
-		drawTextWithOutline(this.centerBanner.text, vec2(cx, H * 0.2), u * 1.05 * bPulse, colorSpark, 2, colorBlack);
-		if (this.centerBanner.subtext) {
-			drawTextWithOutline(this.centerBanner.subtext, vec2(cx, H * 0.25), u * 0.64, colorWhite, 2, colorBlack);
+		// Arcade entrance snap (D-10)
+		let maxF = this.centerBanner.maxFrames || 180;
+		let curF = this.centerBanner.frames;
+		let snapScale = 1.0;
+		if (maxF - curF < 8) {
+			let tSnap = clamp((maxF - curF) / 8, 0, 1);
+			snapScale = 0.85 + 0.15 * tSnap;
+		}
+
+		// Draw border and background box
+		uiDrawRectScreen(bannerPos, vec2(bannerW + 6, bannerH + 6), activeBorderCol);
+		uiDrawRectScreen(bannerPos, vec2(bannerW, bannerH), bgCol);
+
+		// D-07: Anchoring relative to bannerPos.y (-u*0.45 headline, +u*0.55 subtitle; center for single-line)
+		if (hasSubtext) {
+			let headY = bannerPos.y - u * 0.45;
+			let subY = bannerPos.y + u * 0.55;
+			drawTextWithOutline(headText, vec2(cx, headY), headSize * bPulse * snapScale, activeBorderCol, 2, colorBlack);
+			drawTextWithOutline(subText, vec2(cx, subY), subSize, colorWhite, 2, colorBlack);
+		} else {
+			drawTextWithOutline(headText, bannerPos, headSize * bPulse * snapScale, activeBorderCol, 2, colorBlack);
 		}
 	}
 
