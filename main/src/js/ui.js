@@ -516,11 +516,25 @@ function gameRenderPost() {
 
 		const bulletCapped = g_player.ammoBullets >= MAX_AMMO_BULLETS;
 		const rifleCapped = g_player.ammoRifle >= MAX_AMMO_RIFLE;
-		const shellCapped = g_player.ammoShells >= MAX_AMMO_SHELLS;
+		const shellCapped = g_player.ammoShells >= MAX_AMMO_SHELLS; // D-09: Triggers at 8 shells
 
-		const bulletCol = bulletCapped ? colorSpark : txtCol;
-		const rifleCol = rifleCapped ? colorSpark : txtCol;
-		const shellCol = shellCapped ? colorSpark : txtCol;
+		let activeGun = g_player.gun ? g_player.gun.tileIndex : tileNumbers_pistol;
+		let isPistolActive = (activeGun !== tileNumbers_shotgun && activeGun !== tileNumbers_rifle);
+		let isShotgunActive = (activeGun === tileNumbers_shotgun);
+		let isRifleActive = (activeGun === tileNumbers_rifle);
+
+		// D-01, D-02: Low-ammo threshold checks on equipped weapon
+		let isLowBullets = isPistolActive && g_player.ammoBullets < 3;
+		let isLowShells = isShotgunActive && g_player.ammoShells < 2;
+		let isLowRifle = isRifleActive && g_player.ammoRifle < 2;
+
+		// D-20: Pulse amber/red at ~5Hz
+		const pulse = 0.5 + 0.5 * Math.sin(frame * 0.2);
+		const pulseCol = new Color(1, 0.2 + 0.45 * pulse, 0.2);
+
+		const bulletCol = bulletCapped ? colorSpark : isLowBullets ? pulseCol : txtCol;
+		const rifleCol = rifleCapped ? colorSpark : isLowRifle ? pulseCol : txtCol;
+		const shellCol = shellCapped ? colorSpark : isLowShells ? pulseCol : txtCol;
 
 		drawText(g_player.ammoBullets, vec2(pos.x - txtDx, y + 0.6 * scaleUI), txtSize, bulletCol, -1, undefined, "right");
 		drawText(g_player.ammoRifle, vec2(pos.x - txtDx, y), txtSize, rifleCol, -1, undefined, "right");
