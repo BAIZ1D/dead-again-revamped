@@ -558,8 +558,24 @@ function textsClear() {
 	textBottom = undefined;
 }
 
-function drawTextWithOutline(text, pos, size, textColor, outlineColor = colorBlack) {
-	drawTextScreen(text, pos, size, textColor, size / 15, outlineColor);
+function drawTextWithOutline(text, pos, size, textColor, arg5, arg6, textAlign = 'center') {
+	let outlineWidth;
+	let outlineColor;
+
+	if (typeof arg5 === 'number') {
+		// 6-argument call: (text, pos, size, textColor, outlineWidth, outlineColor)
+		outlineWidth = arg5;
+		outlineColor = arg6 || colorBlack;
+	} else {
+		// 4 or 5-argument call: (text, pos, size, textColor, outlineColor)
+		outlineWidth = Math.max(1.5, size / 15);
+		outlineColor = arg5 || colorBlack;
+		if (typeof arg6 === 'string') {
+			textAlign = arg6;
+		}
+	}
+
+	drawTextScreen(text, pos, size, textColor, outlineWidth, outlineColor, textAlign);
 }
 
 function testForMiscount() {
