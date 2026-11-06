@@ -1002,10 +1002,16 @@ export async function runGenerateIcons() {
   console.log('--- Starting Native Icon & Asset Generation Pipeline ---');
 
   // 1. Primary Master PNG (1024x1024)
-  const masterPng = generateMasterIcon();
   const masterPngPath = path.join(assetsDir, 'icon.png');
-  fs.writeFileSync(masterPngPath, masterPng);
-  console.log(`✓ Generated: ${masterPngPath} (${masterPng.length} bytes)`);
+  let masterPng;
+  if (fs.existsSync(masterPngPath)) {
+    console.log(`[Icon] Using existing master icon at ${masterPngPath}`);
+    masterPng = fs.readFileSync(masterPngPath);
+  } else {
+    masterPng = generateMasterIcon();
+    fs.writeFileSync(masterPngPath, masterPng);
+    console.log(`✓ Generated: ${masterPngPath} (${masterPng.length} bytes)`);
+  }
 
   // 2. Windows Multi-Resolution ICO (16..256 mipmaps)
   // Calling png2icons.createICO with (false, false) produces full uncompressed DIB chunks (> 50KB)
@@ -1020,7 +1026,40 @@ export async function runGenerateIcons() {
 
   // 3. macOS Native ICNS (16..1024 Retina)
   console.log('[Icon] Converting Master PNG to macOS native .icns...');
-  const iconIcns = png2icons.createICNS(masterPng, png2icons.BILINEAR, 0);
+  let iconIcns;
+  try {
+    if (process.platform === 'darwin') {
+      const { execSync } = await import('child_process');
+      const iconsetDir = path.join(assetsDir, 'icon.iconset');
+      fs.mkdirSync(iconsetDir, { recursive: true });
+      const sizes = [
+        { name: 'icon_16x16.png', size: 16 },
+        { name: 'icon_16x16@2x.png', size: 32 },
+        { name: 'icon_32x32.png', size: 32 },
+        { name: 'icon_32x32@2x.png', size: 64 },
+        { name: 'icon_128x128.png', size: 128 },
+        { name: 'icon_128x128@2x.png', size: 256 },
+        { name: 'icon_256x256.png', size: 256 },
+        { name: 'icon_256x256@2x.png', size: 512 },
+        { name: 'icon_512x512.png', size: 512 },
+        { name: 'icon_512x512@2x.png', size: 1024 }
+      ];
+      for (const s of sizes) {
+        execSync(`sips -z ${s.size} ${s.size} "${masterPngPath}" --out "${path.join(iconsetDir, s.name)}" >/dev/null 2>&1`);
+      }
+      const tmpIcns = path.join(assetsDir, 'temp_icon.icns');
+      execSync(`iconutil -c icns "${iconsetDir}" -o "${tmpIcns}" >/dev/null 2>&1`);
+      iconIcns = fs.readFileSync(tmpIcns);
+      fs.unlinkSync(tmpIcns);
+      fs.rmSync(iconsetDir, { recursive: true, force: true });
+    }
+  } catch (err) {
+    console.warn('[Icon] Native iconutil fallback to png2icons:', err.message);
+  }
+
+  if (!iconIcns) {
+    iconIcns = png2icons.createICNS(masterPng, png2icons.BILINEAR, 0);
+  }
   if (!iconIcns) {
     throw new Error('Failed to generate macOS .icns from master PNG');
   }
