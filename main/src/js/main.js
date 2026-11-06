@@ -326,6 +326,12 @@ function uiSound(f = 5) {
 }
 
 function updateStateClickToStart() {
+	if (typeof updateStartScreen === "function") {
+		textsClear();
+		updateStartScreen();
+		return;
+	}
+
 	drawTile(
 		cameraPos,
 		vec2(4),
@@ -665,20 +671,24 @@ function textsDraw() {
 		);
 	}
 
-	// Title Screen: All-Time persistent records (D-29)
+	// Start Screen: Procedural retro arcade artwork (Phase 17, VIS-01)
 	if (g_state == STATE_CLICK_TO_START) {
-		let rec =
-			typeof g_apgManager !== "undefined" && g_apgManager
-				? g_apgManager.allTimeRecords || g_apgManager.loadAllTimeRecords()
-				: null;
-		if (rec) {
-			let mvpStr = "ALL-TIME MVP: " + (rec.mvp ? "@" + rec.mvp.user + " (" + rec.mvp.score + " pts)" : "None");
-			let traitorStr = "ALL-TIME TRAITOR: " + (rec.traitor ? "@" + rec.traitor.user + " (" + rec.traitor.score + " pts)" : "None");
-			let winsStr = "RECORD: " + rec.goodWins + " GOOD WINS - " + rec.badWins + " BAD WINS";
-			let recY = mainCanvas.height * 0.62;
-			let u = Math.max(12, mainCanvas.width / 45);
-			drawTextWithOutline(mvpStr + "  |  " + traitorStr, vec2(mainCanvas.width / 2, recY), u * 0.72, colorSpark);
-			drawTextWithOutline(winsStr, vec2(mainCanvas.width / 2, recY + u * 1.05), u * 0.65, colorBullet);
+		if (typeof renderStartScreen === "function") {
+			renderStartScreen();
+		} else {
+			let rec =
+				typeof g_apgManager !== "undefined" && g_apgManager
+					? g_apgManager.allTimeRecords || g_apgManager.loadAllTimeRecords()
+					: null;
+			if (rec) {
+				let mvpStr = "ALL-TIME MVP: " + (rec.mvp ? "@" + rec.mvp.user + " (" + rec.mvp.score + " pts)" : "None");
+				let traitorStr = "ALL-TIME TRAITOR: " + (rec.traitor ? "@" + rec.traitor.user + " (" + rec.traitor.score + " pts)" : "None");
+				let winsStr = "RECORD: " + rec.goodWins + " GOOD WINS - " + rec.badWins + " BAD WINS";
+				let recY = mainCanvas.height * 0.62;
+				let u = Math.max(12, mainCanvas.width / 45);
+				drawTextWithOutline(mvpStr + "  |  " + traitorStr, vec2(mainCanvas.width / 2, recY), u * 0.72, colorSpark);
+				drawTextWithOutline(winsStr, vec2(mainCanvas.width / 2, recY + u * 1.05), u * 0.65, colorBullet);
+			}
 		}
 	}
 }
