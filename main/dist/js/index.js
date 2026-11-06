@@ -5366,11 +5366,11 @@ var ui_fade = 1;
 var ui_onFaded = undefined;
 
 const ui_clearColors = [
-	[0.5, 0, 0, 0.25],
-	[0.25, 0.25, 0, 0.25],
-	[0.5, 0.5, 0, 0.25],
-	[0, 0, 0.5, 0.25],
-	[0, 0.5, 0.5, 0.25],
+	[0.5, 0, 0, 0.035],     // Level 0: 3.5% Red
+	[0.25, 0.25, 0, 0.035], // Level 1: 3.5% Brown/Yellow
+	[0.5, 0.5, 0, 0.035],   // Level 2: 3.5% Yellow/Olive
+	[0, 0, 0.5, 0.035],     // Level 3: 3.5% Blue
+	[0, 0.5, 0.5, 0.035],   // Level 4: 3.5% Teal
 ];
 
 const ui_fadeCol = new Color(0.2, 0, 0); // when screen is all faded out !
