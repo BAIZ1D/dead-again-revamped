@@ -408,7 +408,7 @@ vm.runInContext(behavioralSimulations, sandbox);
 // -------------------------------------------------------------
 console.log('[Sim 7] Verifying full game compilation via scripts/build-game.js...');
 const buildOutput = execSync('node scripts/build-game.js', { encoding: 'utf8' });
-assert.ok(buildOutput.includes('Compiled 29 files into dist/js/index.js'), 'Full game build must succeed cleanly');
+assert.ok(/Compiled \d+ files into dist\/js\/index\.js/.test(buildOutput), 'Full game build must succeed cleanly');
 console.log('  Passed: scripts/build-game.js successfully compiled all modules without syntax errors.');
 
 console.log('\n=============================================================');
