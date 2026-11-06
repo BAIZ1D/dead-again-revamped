@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/media/game-title.png" width="100%" alt="Dead Again - Revamped (Twitch Edition)">
+  <img src="docs/media/game-title-reworked.png" width="100%" alt="Dead Again - Revamped (Twitch Edition)">
 </p>
 
 <h3 align="center">Retro Top-Down Zombie Survival Shooter with Native Twitch Audience Participation</h3>
