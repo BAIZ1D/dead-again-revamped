@@ -93,53 +93,6 @@ Matches feature integrated spectator voting that ties directly into Twitch Chann
 
 ---
 
-## Weapon Arsenal & Ballistics Specification Matrix
-
-Dead Again - Revamped features a fine-tuned ballistic model designed to reward disciplined trigger control during high-intensity zombie swarms:
-
-| Weapon | Capacity | Fire Mode | Cyclic Rate | Spread / Bloom | Ballistic Characteristics |
-|---|---|---|---|---|---|
-| **Handgun (Pistol)** | 6 rounds | Semi-Auto | Player-paced | Zero bloom ($0^\circ$) | Reliable starting sidearm; precise single-shot targeting. |
-| **Shotgun** | 2 rounds | Double Barrel | Pump blast | Fixed conical spray | Fires 8 heavy buckshot pellets per blast with wide radial spread; devastating stopping power in close quarters. |
-| **Machine Pistol (SMG)** | 20 rounds | Select-Fire (Burst / Hold) | 80ms cyclic (~12.5 shots/s; empty mag in ~1.52s) | Burst: $S \le 0.02$ rad ($\approx 1.15^\circ$)<br>Hold Bloom: $\pm 0.48$ rad ($\approx 27.5^\circ$) | **Dual-Profile Recoil Engine:**<br>- *3-Shot Burst Taps:* Pinpoint laser accuracy ($S \le 0.02$ rad) with zero screenshake.<br>- *Continuous Hold Spray:* 80ms high-cadence buzzsaw with escalating non-linear bloom cone ($\pm 0.48$ rad), $\pm 8\%$ velocity jitter, and micro-screenshake.<br>- *Trigger Reset Window:* 160ms trigger release pause resets bloom counter to initial pinpoint precision. |
-
----
-
-## In-Game HUD Architecture & Ergonomics
-
-The in-game heads-up display is optimized for both streamer situational awareness and live spectator clarity:
-
-- **Top-Left Equipment Card:**
-  - **Chambered Ammo 2x10 Micro-Pip Grid:** Weapons with $>6$ round capacity (Machine Pistol / SMG) wrap into a clean 2-row x 10-column micro-pip grid ($0.52 \cdot \text{scaleUI}$, $0.50 \cdot \text{scaleUI}$ horizontal pitch, $0.54 \cdot \text{scaleUI}$ vertical pitch), contained strictly inside the top-left equipment box and eliminating crosshair overflow. Spent rounds dim to 20% opacity (`colorWhite.scale(0.2)`).
-  - **Avatar-Anchored Health Telemetry:** Player health pips (3 base pixel hearts and 1 golden shield pip) render directly beneath the player avatar in world space (`pos.y - 1.35 * scaleUI`) with a dark armored backing plate (`rgba(0, 0, 0, 0.45)`). Includes biological heartbeat double-pulse at 1 HP (`0.28 \cdot \sin(...)` and `0.16 \cdot \sin(...)` with red-ghosting highlight).
-  - **Total Reserve Ammo Counters:** Clear digital counter displays total remaining reserve rounds per weapon type.
-
----
-
-## Dynamic Center Notification Banners
-
-Twitch APG events and major match shifts trigger broadcast-grade notification banners with adaptive geometry:
-
-- **Adaptive Container Dimensions:** Center notification banners dynamically calculate container height (`u * 2.4` for single-line headline vs `u * 3.4` for dual-line headline + subtitle).
-- **Relative Text Anchoring:** Headline anchored to `bannerPos.y - u * 0.45` and subtitle anchored to `bannerPos.y + u * 0.55`, eliminating vertical clipping on Divine Flash & Blood Surge.
-- **Responsive Text Downscaling:** Banner width capped at 92% screen width (`W * 0.92`) with proportional font downscaling for long Twitch usernames (`scale = Math.min(1.0, maxTextW / measuredW)`).
-
----
-
-## Start Screen Retro Arcade Visual Overhaul & In-Game Field Manual
-
-The title and menu experience features procedural retro arcade visuals and instant in-game reference:
-
-- **Heraldic Hero Crest:** Procedural Canvas 2D heater shield with faceted 3D shading, royal gold trim (`#D4AF37`), crossed Shotgun ($-35^\circ$) and SMG ($+35^\circ$) tiles with specular glints, and split Tug-of-War insignia (Golden Star vs Crimson Skull glyph separated by a glowing 2px center seam).
-- **Opposing Faction Portraits:** Dynamic idle floating portraits ($\pm 3$px sinusoidal movement) flanking the crest—Survivor portrait with golden divine aura (`#FBF236`) vs Zombie face with crimson miasma aura (`#AC3232`).
-- **Arcade Atmosphere:** 24 procedural rising ember particles with organic horizontal sine flutter, authentic horizontal CRT scanlines every 3px (alpha 0.055), dark-crimson perimeter radial vignette, and chromatic typography glows (Twitch-purple `#9146FF` and blood-red) with a 4-second specular sheen sweep on the subtitle ribbon.
-- **In-Game Field Manual & Streamer Guide Modal (`[H]`):** Canvas 2D immediate-mode terminal card with 3 navigable tabs:
-  - Tab 1: *Combat & Weapons* (ballistics, burst fire vs hold bloom, ammo drops).
-  - Tab 2: *Twitch APG & Audience Mechanics* (Tug-of-War, Karma meter, chat commands, Divine Flash & Blood Surge).
-  - Tab 3: *Streamer Setup & Quick Start* (dual-window layout, OBS window capture, hotkeys).
-
----
-
 ## Unified Multi-Input Controls Matrix
 
 Play seamlessly with full keyboard, mouse, and controller support:
@@ -266,7 +219,7 @@ Dead Again - Revamped v1.2.0 delivers major tactical combat refinements, ergonom
    - 160ms trigger release pause reset window fully restores laser pinpoint accuracy.
 
 2. **HUD Ergonomics & Anti-Clipping:**
-   - SMG chambered ammo wrapped into a 2-row x 10-column micro-pip grid ($0.52 \cdot \text{scaleUI}$) contained strictly within equipment card box, eliminating bullet icon overflow.
+   - SMG chambered ammo wrapped into a 2x10 micro-pip grid ($0.52 \cdot \text{scaleUI}$) contained strictly within equipment card box, eliminating bullet icon overflow.
    - Player health pips relocated beneath avatar portrait in world space (`pos.y - 1.35 * scaleUI`) with dark armored backing plate and 1 HP double-beat biological pulse.
    - Center notification banners dynamically calculate container dimensions (`u * 2.4` single vs `u * 3.4` dual-line) and anchor text relative to box center, eliminating subtitle clipping on Divine Flash & Blood Surge across 720p, 1080p, and 4K viewports.
    - Repaired text outline stroke styling polymorphism (`drawTextWithOutline` supporting 5- and 6-argument calls) resolving numeric `strokeStyle` assignments.
