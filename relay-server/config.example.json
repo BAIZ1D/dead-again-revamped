@@ -8,7 +8,8 @@
   "isMock": false,
   "rateLimits": {
     "baseCooldownMs": 3000,
-    "bossCooldownMs": 8000,
+    "bossCooldownMs": 4000,
+    "blackoutCooldownMs": 8000,
     "userThrottleMs": 2000
   }
 }
