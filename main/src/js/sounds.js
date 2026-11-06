@@ -76,3 +76,12 @@ var soundOutcomeBad = new Sound([2.4, 0, 85, 0.08, 0.65, 0.95, 3, 2.5, -3, -1, -
 // Deep biological heartbeat thump for 1 HP danger state (D-05)
 // Low sine wave (shape 0), 60Hz, fast attack 0.01s, quick decay with pitch drop
 var soundHeartbeat = new Sound([1.5, 0, 60, 0.01, 0.05, 0.14, 0, 1.8, -6, 0, 0, 0, 0, 0, 0, 0, 0, 0.65, 0.02, 0]);
+
+// Ominous war-horn stinger for Blood Surge / Frenzy activation (D-13)
+// Low saw/brass tone (shape 2), 110Hz, slow attack 0.08s, long sustain 0.6s, pitch slide
+var soundWarHorn = new Sound([1.8, 0, 110, 0.08, 0.6, 0.9, 2, 2.1, -1.2, -0.4, 0, 0, 0, 0.1, 0.05, 0.15, 0.08, 0.8, 0.12, 0.3]);
+
+// Seismic rumble for 2-second pre-surge telegraph (D-11)
+// Sub-bass sine wave (shape 0), 42Hz, slow attack 0.2s, 1.2s sustain with atmospheric noise
+var soundRumble = new Sound([1.2, 0, 42, 0.2, 1.2, 1.4, 0, 1.4, 0, 0, 0, 0, 0, 0.4, 0, 0.1, 0.15, 0.75, 0.2, 0.1]);
+

@@ -986,6 +986,15 @@ var soundOutcomeBad = new Sound([2.4, 0, 85, 0.08, 0.65, 0.95, 3, 2.5, -3, -1, -
 // Low sine wave (shape 0), 60Hz, fast attack 0.01s, quick decay with pitch drop
 var soundHeartbeat = new Sound([1.5, 0, 60, 0.01, 0.05, 0.14, 0, 1.8, -6, 0, 0, 0, 0, 0, 0, 0, 0, 0.65, 0.02, 0]);
 
+// Ominous war-horn stinger for Blood Surge / Frenzy activation (D-13)
+// Low saw/brass tone (shape 2), 110Hz, slow attack 0.08s, long sustain 0.6s, pitch slide
+var soundWarHorn = new Sound([1.8, 0, 110, 0.08, 0.6, 0.9, 2, 2.1, -1.2, -0.4, 0, 0, 0, 0.1, 0.05, 0.15, 0.08, 0.8, 0.12, 0.3]);
+
+// Seismic rumble for 2-second pre-surge telegraph (D-11)
+// Sub-bass sine wave (shape 0), 42Hz, slow attack 0.2s, 1.2s sustain with atmospheric noise
+var soundRumble = new Sound([1.2, 0, 42, 0.2, 1.2, 1.4, 0, 1.4, 0, 0, 0, 0, 0, 0.4, 0, 0.1, 0.15, 0.75, 0.2, 0.1]);
+
+
 /** @format */
 
 var songData = [
@@ -1545,6 +1554,11 @@ class APGManager {
 		this.allTimeRecords = this.loadAllTimeRecords();
 		this.matchSummary = null;
 
+		// Ambient Auto-Frenzy cadence & telegraph tracking (BAL-20, D-07..D-11)
+		this.ambientFrenzyTimer = rand(2700, 3600) | 0; // 45-60s initial grace period (D-07, D-10)
+		this.ambientTelegraphFired = false;
+		this.bottomHudAlpha = 1.0;
+
 		// Register network listeners
 		if (typeof g_apgNetwork !== "undefined" && g_apgNetwork) {
 			var self = this;
@@ -1566,6 +1580,9 @@ class APGManager {
 		};
 		this.recentBadActions = [];
 		this.matchSummary = null;
+		this.ambientFrenzyTimer = rand(2700, 3600) | 0;
+		this.ambientTelegraphFired = false;
+		this.bottomHudAlpha = 1.0;
 		this.resetForNewLevel();
 	}
 
@@ -1589,6 +1606,9 @@ class APGManager {
 		this.centerBanner = null;
 		this.clutchComboFrames = 0;
 		this.clutchComboKills = 0;
+		this.ambientFrenzyTimer = rand(2700, 3600) | 0;
+		this.ambientTelegraphFired = false;
+		this.bottomHudAlpha = 1.0;
 		this.clearActiveEffects();
 	}
 
@@ -2021,9 +2041,11 @@ class APGManager {
 			this.addWorldPopup("GUN JAMMED!", g_player.pos.add(vec2(0, 0.85)), colorBlood);
 			this.addToast("[BAD] @" + tag + " JAMMED the streamer's weapon!", "bad");
 		} else if (action === "frenzy") {
-			// D-11, D-12: Blood frenzy
+			// D-11, D-12, D-14: Blood frenzy refresh & extension, capped at max 8.0s
 			this.timers.slow = 0;
-			this.timers.frenzy = 480; // 8s
+			this.timers.frenzy = Math.min(480, Math.max(this.timers.frenzy || 0, 0) + 480);
+			this.ambientFrenzyTimer = rand(2700, 3600) | 0; // Reset ambient countdown
+			this.ambientTelegraphFired = false;
 			this.addToast("[BAD] @" + tag + " unleashed Enemy Blood FRENZY!", "bad");
 		}
 
@@ -2153,7 +2175,48 @@ class APGManager {
 		}
 	}
 
+	triggerAmbientFrenzy() {
+		this.timers.slow = 0;
+		// 360 frames (6.0s duration) without double speed stacking (D-08, D-14)
+		this.timers.frenzy = Math.min(480, (this.timers.frenzy || 0) + 360);
+		this.ambientFrenzyTimer = rand(2700, 3600) | 0;
+		this.ambientTelegraphFired = false;
+
+		if (typeof soundWarHorn !== "undefined") soundWarHorn.play();
+		uiflashScreen("#ac3232", 8);
+
+		this.centerBanner = {
+			text: "⚠️ BLOOD SURGE: The Horde has Enraged!",
+			subtext: "ALL ENEMIES SPRINTING WITH ENHANCED FURY (6s)",
+			color: colorBlood,
+			frames: 180,
+			maxFrames: 180,
+		};
+		this.addToast("⚠️ BLOOD SURGE: Horde Enraged (6.0s)!", "bad");
+	}
+
 	update() {
+		// Ambient Frenzy countdown & gating (D-07..D-11, D-14)
+		if (typeof g_state !== "undefined" && g_state === STATE_PLAYING && !g_isPaused && g_player && g_player.hp > 0) {
+			let livingEnemies = typeof g_enemies !== "undefined" ? g_enemies.filter(e => e && e.hp > 0).length : 0;
+
+			// Only countdown if frenzy is not currently active
+			if (this.timers.frenzy <= 0) {
+				if (this.ambientFrenzyTimer > 0) {
+					this.ambientFrenzyTimer--;
+
+					// 120-frame (2.0s) atmospheric rumble telegraph (D-11)
+					if (this.ambientFrenzyTimer === 120 && !this.ambientTelegraphFired) {
+						this.ambientTelegraphFired = true;
+						if (typeof soundRumble !== "undefined") soundRumble.play();
+					}
+				} else if (livingEnemies > 0) {
+					// Timer hit 0 and enemies are present: trigger surge! (D-08, D-12, D-13)
+					this.triggerAmbientFrenzy();
+				}
+			}
+		}
+
 		// Smooth Karma Bar interpolation
 		let total = this.goodActions + this.badActions;
 		let targetPct = total === 0 ? 50 : Math.round((this.goodActions / total) * 100);
@@ -3041,6 +3104,20 @@ class APGManager {
 		}
 	}
 
+	renderAmbientTelegraphVignette(W, H, cx) {
+		if (this.ambientFrenzyTimer <= 120 && this.ambientFrenzyTimer > 0 && typeof overlayContext !== "undefined") {
+			let t = 1 - this.ambientFrenzyTimer / 120;
+			let pulse = 0.25 + 0.1 * Math.sin(frame * 0.15);
+			let vignetteAlpha = t * pulse;
+			let cy = H / 2;
+			let grad = overlayContext.createRadialGradient(cx, cy, Math.min(W, H) * 0.35, cx, cy, Math.max(W, H) * 0.72);
+			grad.addColorStop(0, "rgba(180, 0, 0, 0)");
+			grad.addColorStop(1, "rgba(180, 0, 0, " + vignetteAlpha.toFixed(3) + ")");
+			overlayContext.fillStyle = grad;
+			overlayContext.fillRect(0, 0, W, H);
+		}
+	}
+
 	renderHUD() {
 		if (typeof g_state === "undefined" || g_state !== STATE_PLAYING) return;
 		const W =
@@ -3063,6 +3140,7 @@ class APGManager {
 		this.renderActiveTimerPills(W, H, cx, u);
 		this.renderToastsAndCharges(W, H, u);
 		this.renderCenterBanner(W, H, cx, u);
+		this.renderAmbientTelegraphVignette(W, H, cx);
 	}
 }
 
