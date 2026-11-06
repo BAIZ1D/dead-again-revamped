@@ -484,9 +484,22 @@ function gameRenderPost() {
 			colorWhite.scale(0.7)
 		);
 
-		// 3-Heart / Golden Shield Pips above portrait (D-13, D-21, BAL-07)
+		// 3-Heart / Golden Shield Pips relocated beneath avatar portrait (HUD-04, D-04, D-05, D-06)
+		const platePos = vec2(pos.x - 5.0 * scaleUI, pos.y - 1.35 * scaleUI);
+		const plateSize = vec2(2.7, 0.65).scale(scaleUI);
+
+		// Armored backing plate (D-04)
+		drawRect(platePos, plateSize, new Color(0, 0, 0, 0.45));
+
+		// 1 HP critical danger red-ghosting highlight beneath avatar (D-05)
+		if (g_player.hp === 1) {
+			let ghostPulse = 0.25 + 0.15 * Math.sin(frame * 0.2);
+			drawRect(platePos, plateSize.add(vec2(0.1 * scaleUI)), colorBlood.scale(ghostPulse));
+		}
+
 		for (let i = 0; i < 4; i++) {
-			let pipPos = vec2(pos.x - 5.7 * scaleUI + i * 0.65 * scaleUI, pos.y + 1.25 * scaleUI);
+			// Centered horizontally across X in [pos.x - 5.975 * scaleUI, pos.x - 4.025 * scaleUI] (D-04)
+			let pipPos = vec2(pos.x - 5.975 * scaleUI + i * 0.65 * scaleUI, pos.y - 1.35 * scaleUI);
 			let pipType = "empty";
 			if (i < 3) {
 				pipType = g_player.hp >= i + 1 ? "heart" : "empty";
