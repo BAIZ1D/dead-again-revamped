@@ -152,6 +152,21 @@ class Gun extends EngineObject {
 
 	setOwner(player) {
 		if (player.gun) {
+			// D-11: Swapping weapons returns loaded cylinder ammo to player's reserve pool
+			if (player.gun.ammo > 0) {
+				if (player.gun.tileIndex == tileNumbers_rifle) {
+					player.ammoRifle += player.gun.ammo;
+				} else if (player.gun.tileIndex == tileNumbers_shotgun) {
+					player.ammoShells += player.gun.ammo;
+				} else {
+					player.ammoBullets += player.gun.ammo;
+				}
+				player.gun.ammo = 0;
+				if (typeof player.clampAmmo === "function") {
+					player.clampAmmo();
+				}
+			}
+
 			// throw current gun
 			player.gun.size.y = this._mysize;
 			player.gun.angle = 0;

@@ -57,9 +57,9 @@ var g_lobbyTransitioning = false;
 function enterLobbyState() {
 	if (g_player) {
 		g_savedEquipment = {
-			ammoPistol: Math.min(g_player.ammoBullets, MAX_AMMO_BULLETS),
-			ammoShotgun: Math.min(g_player.ammoShells, MAX_AMMO_SHELLS),
-			ammoRifle: Math.min(g_player.ammoRifle, MAX_AMMO_RIFLE),
+			ammoPistol: Math.min(g_player.ammoBullets, LEVEL_TRANSITION_MAX_BULLETS),
+			ammoShotgun: Math.min(g_player.ammoShells, LEVEL_TRANSITION_MAX_SHELLS),
+			ammoRifle: Math.min(g_player.ammoRifle, LEVEL_TRANSITION_MAX_RIFLE),
 			currentGun: g_player.gun ? g_player.gun.tileIndex : tileNumbers_pistol,
 			gunAmmo: g_player.gun ? g_player.gun.ammo : 6,
 			playerHp: g_player ? clamp(g_player.hp, 1, 4) : 3,
@@ -114,9 +114,9 @@ function enterLobbyState() {
 
 function startNextLevel() {
 	// save gun and ammo
-	let ammoPistol = Math.min(g_player ? g_player.ammoBullets : g_savedEquipment ? g_savedEquipment.ammoPistol : 12, MAX_AMMO_BULLETS);
-	let ammoShotgun = Math.min(g_player ? g_player.ammoShells : g_savedEquipment ? g_savedEquipment.ammoShotgun : 0, MAX_AMMO_SHELLS);
-	let ammoRifle = Math.min(g_player ? g_player.ammoRifle : g_savedEquipment ? g_savedEquipment.ammoRifle : 0, MAX_AMMO_RIFLE);
+	let ammoPistol = Math.min(g_player ? g_player.ammoBullets : g_savedEquipment ? g_savedEquipment.ammoPistol : 12, LEVEL_TRANSITION_MAX_BULLETS);
+	let ammoShotgun = Math.min(g_player ? g_player.ammoShells : g_savedEquipment ? g_savedEquipment.ammoShotgun : 0, LEVEL_TRANSITION_MAX_SHELLS);
+	let ammoRifle = Math.min(g_player ? g_player.ammoRifle : g_savedEquipment ? g_savedEquipment.ammoRifle : 0, LEVEL_TRANSITION_MAX_RIFLE);
 	let currentGun = g_player && g_player.gun ? g_player.gun.tileIndex : g_savedEquipment ? g_savedEquipment.currentGun : tileNumbers_pistol; // default
 	let gunAmmo = g_player && g_player.gun ? g_player.gun.ammo : g_savedEquipment ? g_savedEquipment.gunAmmo : 6;
 	let savedHp = g_player ? clamp(g_player.hp, 1, 4) : (g_savedEquipment && g_savedEquipment.playerHp ? clamp(g_savedEquipment.playerHp, 1, 4) : 3);
@@ -512,9 +512,9 @@ function updateStatePlaying() {
 				}
 			}
 			if (!hasNearbyReachableAmmo) {
-				let newAmmo = new AmmoBox(findFreePosRange(2.5, 4.0, true), g_player.gun.tileIndex);
+				let newAmmo = new AmmoBox(findFreePosRange(2.5, 4.0, true), g_player.gun.tileIndex, null, true);
 				soundLevelCleared.play(newAmmo.pos, 0.5, 3);
-				ammoCooldownFrames = 120;
+				ammoCooldownFrames = 240;
 			}
 		}
 	}
