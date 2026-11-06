@@ -24,6 +24,18 @@ class AmmoBox extends EngineObject {
 	}
 
 	update() {
+		let curFrame = typeof frame !== "undefined" ? frame : 0;
+		let maxLife = this.isScavenged ? 1500 : this.twitchUser ? 1800 : Infinity;
+		let elapsed = curFrame - this.spawnFrame;
+
+		if (elapsed >= maxLife) {
+			if (typeof makeParticles === "function") {
+				makeParticles(this.pos, 0.4, colorWhite, 0.5);
+			}
+			this.destroy();
+			return;
+		}
+
 		if (!g_player) return;
 
 		if (isOverlapping(this.pos, this._hitbox, g_player.pos, g_player._hitbox)) {
@@ -76,5 +88,17 @@ class AmmoBox extends EngineObject {
 			}
 			this.destroy();
 		}
+	}
+
+	render() {
+		let curFrame = typeof frame !== "undefined" ? frame : 0;
+		let maxLife = this.isScavenged ? 1500 : this.twitchUser ? 1800 : Infinity;
+		let remaining = maxLife - (curFrame - this.spawnFrame);
+
+		// D-14, D-15: Final 5-second rapid flashing warning (toggle every 4 frames ~7.5Hz)
+		if (remaining <= 300 && Math.floor(curFrame / 4) % 2 === 0) {
+			return;
+		}
+		super.render();
 	}
 }

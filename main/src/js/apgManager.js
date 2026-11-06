@@ -1182,6 +1182,11 @@ class APGManager {
 			for (let i = 0; i < engineObjects.length; i++) {
 				let obj = engineObjects[i];
 				if (typeof AmmoBox !== "undefined" && obj instanceof AmmoBox && obj.twitchUser) {
+					let curFrame = typeof frame !== "undefined" ? frame : 0;
+					let elapsed = curFrame - (obj.spawnFrame || 0);
+					if (1800 - elapsed <= 300 && Math.floor(curFrame / 4) % 2 === 0) {
+						continue;
+					}
 					let p = 0.55 + 0.4 * Math.sin((frame - (obj.spawnFrame || 0)) / 6);
 					let ringRad = 0.55 + 0.08 * Math.sin((frame - (obj.spawnFrame || 0)) / 10);
 					let rot = (frame - (obj.spawnFrame || 0)) * 0.04;
@@ -1276,6 +1281,11 @@ class APGManager {
 			for (let i = 0; i < engineObjects.length; i++) {
 				let obj = engineObjects[i];
 				if (typeof AmmoBox !== "undefined" && obj instanceof AmmoBox && obj.twitchUser) {
+					let curFrame = typeof frame !== "undefined" ? frame : 0;
+					let elapsed = curFrame - (obj.spawnFrame || 0);
+					if (1800 - elapsed <= 300 && Math.floor(curFrame / 4) % 2 === 0) {
+						continue;
+					}
 					let bobOffset = 0.68 + 0.09 * Math.sin((frame - (obj.spawnFrame || 0)) / 8);
 					let screenPos = worldToScreen(obj.pos.add(vec2(0, bobOffset)));
 					if (screenPos.x >= 20 && screenPos.x <= W - 20 && screenPos.y >= 20 && screenPos.y <= H - 20) {
