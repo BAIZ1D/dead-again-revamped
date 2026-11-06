@@ -105,7 +105,12 @@ class MapManager {
 						new Pistol(offsetVec);
 						continue;
 					} else if (t == tileNumbers_shotgun) {
-						new Shotgun(offsetVec);
+						// BAL-21, D-08: Defer shotgun discovery to Level 2+
+						if (g_level < 2) {
+							new MachinePistol(offsetVec);
+						} else {
+							new Shotgun(offsetVec);
+						}
 						continue;
 					} else if (t == tileNumbers_rifle) {
 						new Rifle(offsetVec);
@@ -120,7 +125,12 @@ class MapManager {
 						new AmmoBox(offsetVec, tileNumbers_pistol);
 						continue;
 					} else if (t == tileNumbers_boxShells) {
-						new AmmoBox(offsetVec, tileNumbers_shotgun);
+						// BAL-21, D-08: Replace shell crates with bullet crates in Levels 0-1
+						if (g_level < 2) {
+							new AmmoBox(offsetVec, tileNumbers_pistol);
+						} else {
+							new AmmoBox(offsetVec, tileNumbers_shotgun);
+						}
 						continue;
 					} else if (t == tileNumbers_boxRifleAmmo) {
 						new AmmoBox(offsetVec, tileNumbers_rifle);
