@@ -57,9 +57,9 @@ var g_lobbyTransitioning = false;
 function enterLobbyState() {
 	if (g_player) {
 		g_savedEquipment = {
-			ammoPistol: Math.min(g_player.ammoBullets, MAX_AMMO_BULLETS),
-			ammoShotgun: Math.min(g_player.ammoShells, MAX_AMMO_SHELLS),
-			ammoRifle: Math.min(g_player.ammoRifle, MAX_AMMO_RIFLE),
+			ammoPistol: Math.min(g_player.ammoBullets, LEVEL_TRANSITION_MAX_BULLETS),
+			ammoShotgun: Math.min(g_player.ammoShells, LEVEL_TRANSITION_MAX_SHELLS),
+			ammoRifle: Math.min(g_player.ammoRifle, LEVEL_TRANSITION_MAX_RIFLE),
 			currentGun: g_player.gun ? g_player.gun.tileIndex : tileNumbers_pistol,
 			gunAmmo: g_player.gun ? g_player.gun.ammo : 6,
 			playerHp: g_player ? clamp(g_player.hp, 1, 4) : 3,
@@ -114,9 +114,9 @@ function enterLobbyState() {
 
 function startNextLevel() {
 	// save gun and ammo
-	let ammoPistol = Math.min(g_player ? g_player.ammoBullets : g_savedEquipment ? g_savedEquipment.ammoPistol : 12, MAX_AMMO_BULLETS);
-	let ammoShotgun = Math.min(g_player ? g_player.ammoShells : g_savedEquipment ? g_savedEquipment.ammoShotgun : 0, MAX_AMMO_SHELLS);
-	let ammoRifle = Math.min(g_player ? g_player.ammoRifle : g_savedEquipment ? g_savedEquipment.ammoRifle : 0, MAX_AMMO_RIFLE);
+	let ammoPistol = Math.min(g_player ? g_player.ammoBullets : g_savedEquipment ? g_savedEquipment.ammoPistol : 12, LEVEL_TRANSITION_MAX_BULLETS);
+	let ammoShotgun = Math.min(g_player ? g_player.ammoShells : g_savedEquipment ? g_savedEquipment.ammoShotgun : 0, LEVEL_TRANSITION_MAX_SHELLS);
+	let ammoRifle = Math.min(g_player ? g_player.ammoRifle : g_savedEquipment ? g_savedEquipment.ammoRifle : 0, LEVEL_TRANSITION_MAX_RIFLE);
 	let currentGun = g_player && g_player.gun ? g_player.gun.tileIndex : g_savedEquipment ? g_savedEquipment.currentGun : tileNumbers_pistol; // default
 	let gunAmmo = g_player && g_player.gun ? g_player.gun.ammo : g_savedEquipment ? g_savedEquipment.gunAmmo : 6;
 	let savedHp = g_player ? clamp(g_player.hp, 1, 4) : (g_savedEquipment && g_savedEquipment.playerHp ? clamp(g_savedEquipment.playerHp, 1, 4) : 3);
@@ -512,9 +512,9 @@ function updateStatePlaying() {
 				}
 			}
 			if (!hasNearbyReachableAmmo) {
-				let newAmmo = new AmmoBox(findFreePosRange(2.5, 4.0, true), g_player.gun.tileIndex);
+				let newAmmo = new AmmoBox(findFreePosRange(2.5, 4.0, true), g_player.gun.tileIndex, null, true);
 				soundLevelCleared.play(newAmmo.pos, 0.5, 3);
-				ammoCooldownFrames = 120;
+				ammoCooldownFrames = 240;
 			}
 		}
 	}
@@ -1824,13 +1824,26 @@ class APGManager {
 					typeof findFreePosRange === "function"
 						? findFreePosRange(1.8, 2.8, true)
 						: pos.add(vec2(0.6, 0));
+				let curLevel = typeof g_level !== "undefined" ? g_level : 0;
 				let r = rand();
-				if (r < 0.33) {
-					new Shotgun(upPos);
-				} else if (r < 0.66) {
-					new Rifle(upPos);
+
+				// BAL-21, D-07: Shotgun gatekeeping
+				if (curLevel < 2) {
+					// Levels 0-1: Shotguns disabled; 50% Rifle / 50% Machine Pistol
+					if (r < 0.50) {
+						new Rifle(upPos);
+					} else {
+						new MachinePistol(upPos);
+					}
 				} else {
-					new MachinePistol(upPos);
+					// Level 2+: 10% Shotgun / 45% Rifle / 45% Machine Pistol
+					if (r < 0.10) {
+						new Shotgun(upPos);
+					} else if (r < 0.55) {
+						new Rifle(upPos);
+					} else {
+						new MachinePistol(upPos);
+					}
 				}
 				this.addToast("[GOOD] @" + tag + " dropped Ammo + WEAPON UPGRADE!", "good");
 			} else {
@@ -2629,6 +2642,11 @@ class APGManager {
 			for (let i = 0; i < engineObjects.length; i++) {
 				let obj = engineObjects[i];
 				if (typeof AmmoBox !== "undefined" && obj instanceof AmmoBox && obj.twitchUser) {
+					let curFrame = typeof frame !== "undefined" ? frame : 0;
+					let elapsed = curFrame - (obj.spawnFrame || 0);
+					if (1800 - elapsed <= 300 && Math.floor(curFrame / 4) % 2 === 0) {
+						continue;
+					}
 					let p = 0.55 + 0.4 * Math.sin((frame - (obj.spawnFrame || 0)) / 6);
 					let ringRad = 0.55 + 0.08 * Math.sin((frame - (obj.spawnFrame || 0)) / 10);
 					let rot = (frame - (obj.spawnFrame || 0)) * 0.04;
@@ -2723,6 +2741,11 @@ class APGManager {
 			for (let i = 0; i < engineObjects.length; i++) {
 				let obj = engineObjects[i];
 				if (typeof AmmoBox !== "undefined" && obj instanceof AmmoBox && obj.twitchUser) {
+					let curFrame = typeof frame !== "undefined" ? frame : 0;
+					let elapsed = curFrame - (obj.spawnFrame || 0);
+					if (1800 - elapsed <= 300 && Math.floor(curFrame / 4) % 2 === 0) {
+						continue;
+					}
 					let bobOffset = 0.68 + 0.09 * Math.sin((frame - (obj.spawnFrame || 0)) / 8);
 					let screenPos = worldToScreen(obj.pos.add(vec2(0, bobOffset)));
 					if (screenPos.x >= 20 && screenPos.x <= W - 20 && screenPos.y >= 20 && screenPos.y <= H - 20) {
@@ -3398,7 +3421,8 @@ class Enemy extends Mob {
 					// D-08: Audience Mini-Boss does NOT end the level or wipe other enemies!
 					g_score += 4; // +4 here + 1 below = +5 bonus score
 					let gunTile = g_player && g_player.gun ? g_player.gun.tileIndex : tileNumbers_pistol;
-					new AmmoBox(this.pos.copy(), gunTile, this.twitchUser, false);
+					// D-05: Mini-boss drops Full Care Package (isFullPackage = true)
+					new AmmoBox(this.pos.copy(), gunTile, this.twitchUser, false, true);
 					if (typeof g_apgManager !== "undefined" && g_apgManager) {
 						g_apgManager.onEnemyKilled(this);
 					}
@@ -3415,7 +3439,7 @@ class Enemy extends Mob {
 					levelCleared = true;
 				}
 			} else {
-				// Regular enemy kill ammo drop logic (BAL-12)
+				// Regular enemy kill ammo drop logic (BAL-15, D-01, D-02, D-03, D-17)
 				let gunTile = g_player && g_player.gun ? g_player.gun.tileIndex : tileNumbers_pistol;
 				let reserve = 0;
 				if (g_player) {
@@ -3423,9 +3447,27 @@ class Enemy extends Mob {
 					else if (gunTile === tileNumbers_rifle) reserve = g_player.ammoRifle;
 					else reserve = g_player.ammoBullets;
 				}
-				let isLowAmmo = g_player && reserve < (gunTile === tileNumbers_shotgun ? 2 : gunTile === tileNumbers_rifle ? 2 : 6);
-				let shouldDrop = !(this instanceof BossZombie) && (isLowAmmo || rand() < 0.20);
+
+				// D-01, D-02: Clutch thresholds: <3 bullets for Pistol/SMG, <2 shells/rifle
+				let clutchThreshold = (gunTile === tileNumbers_shotgun ? 2 : gunTile === tileNumbers_rifle ? 2 : 3);
+				let isLowAmmo = g_player && reserve < clutchThreshold;
+
+				// D-03: 60-frame (1.0s) throttle prevents simultaneous drops from multi-kills
+				let nowFrame = typeof frame !== "undefined" ? frame : 0;
+				Enemy.lastClutchDropFrame = Enemy.lastClutchDropFrame || -999;
+				let isClutch = isLowAmmo && (nowFrame - Enemy.lastClutchDropFrame >= 60);
+
+				// D-17: Tiered base kill drop rates by mob lethality (averaging ~7%)
+				let dropRate = 0.07;
+				if (this instanceof Zombie) dropRate = 0.05;
+				else if (this instanceof Vampire) dropRate = 0.10;
+				else if (this instanceof Ghost) dropRate = 0.12;
+
+				let shouldDrop = !(this instanceof BossZombie) && (isClutch || rand() < dropRate);
 				if (shouldDrop) {
+					if (isClutch) {
+						Enemy.lastClutchDropFrame = nowFrame;
+					}
 					new AmmoBox(this.pos.copy(), gunTile, null, true);
 					if (typeof soundPickup !== "undefined" && soundPickup) {
 						soundPickup.play(this.pos, 0.3, 2);
@@ -3628,6 +3670,21 @@ class Gun extends EngineObject {
 
 	setOwner(player) {
 		if (player.gun) {
+			// D-11: Swapping weapons returns loaded cylinder ammo to player's reserve pool
+			if (player.gun.ammo > 0) {
+				if (player.gun.tileIndex == tileNumbers_rifle) {
+					player.ammoRifle += player.gun.ammo;
+				} else if (player.gun.tileIndex == tileNumbers_shotgun) {
+					player.ammoShells += player.gun.ammo;
+				} else {
+					player.ammoBullets += player.gun.ammo;
+				}
+				player.gun.ammo = 0;
+				if (typeof player.clampAmmo === "function") {
+					player.clampAmmo();
+				}
+			}
+
 			// throw current gun
 			player.gun.size.y = this._mysize;
 			player.gun.angle = 0;
@@ -3747,66 +3804,96 @@ class AmmoBox extends EngineObject {
 		return c;
 	}
 
-	constructor(pos, gunType, twitchUser = null, isScavenged = false) {
-		super(pos, vec2(1), getAmmoForGunType(gunType), TILE_SIZE);
+	constructor(pos, gunType, twitchUser = null, isScavenged = false, isFullPackage = false) {
+		// D-19: Scavenged clips render at 0.75x tile scale
+		let boxSize = isScavenged ? vec2(0.75) : vec2(1);
+		super(pos, boxSize, getAmmoForGunType(gunType), TILE_SIZE);
 
 		this._hitbox = vec2(0.5);
 		// Phase 3 APG care package attribution (D-01, NAME-03)
 		this.twitchUser = twitchUser;
 		this.isScavenged = Boolean(isScavenged);
+		this.isFullPackage = Boolean(isFullPackage);
 		this.spawnFrame = typeof frame !== "undefined" ? frame : 0;
 	}
 
 	update() {
+		let curFrame = typeof frame !== "undefined" ? frame : 0;
+		let maxLife = this.isScavenged ? 1500 : this.twitchUser ? 1800 : Infinity;
+		let elapsed = curFrame - this.spawnFrame;
+
+		if (elapsed >= maxLife) {
+			if (typeof makeParticles === "function") {
+				makeParticles(this.pos, 0.4, colorWhite, 0.5);
+			}
+			this.destroy();
+			return;
+		}
+
 		if (!g_player) return;
 
 		if (isOverlapping(this.pos, this._hitbox, g_player.pos, g_player._hitbox)) {
 			if (this.isScavenged) {
-				// BAL-11: Scavenged clips from slain enemies
+				// BAL-16: Scavenged enemy drop yields (+2 bullets / +1 shell / +1 rifle)
 				if (this.tileIndex == tileNumbers_boxShells) {
-					g_player.ammoShells += 2;
+					g_player.ammoShells += 1;
 				} else if (this.tileIndex == tileNumbers_boxRifleAmmo) {
 					g_player.ammoRifle += 1;
 				} else {
-					g_player.ammoBullets += 5;
+					g_player.ammoBullets += 2;
 				}
+				// D-19: Lighter high-pitch pickup chirp for scavenged clips
+				soundPickup.play(this.pos, 0.7, 1.6);
 			} else if (this.twitchUser) {
-				// Audience care package: handled with multi-weapon yields in Plan 06-02
-				let activeGun = g_player.gun ? g_player.gun.tileIndex : tileNumbers_pistol;
-				if (activeGun == tileNumbers_shotgun) {
-					g_player.ammoShells += 4;
-					g_player.ammoBullets += 6;
-					g_player.ammoRifle += 1;
-				} else if (activeGun == tileNumbers_rifle) {
-					g_player.ammoRifle += 2;
-					g_player.ammoBullets += 6;
+				if (this.isFullPackage) {
+					// D-05: Slain audience mini-boss Full Care Package reward
+					g_player.ammoBullets += 4;
 					g_player.ammoShells += 2;
+					g_player.ammoRifle += 1;
 				} else {
-					g_player.ammoBullets += 12;
-					g_player.ammoShells += 2;
-					g_player.ammoRifle += 1;
+					// D-12, BAL-17: Pure Primary Yields (zero cross-pool bleed)
+					let activeGun = g_player.gun ? g_player.gun.tileIndex : tileNumbers_pistol;
+					if (activeGun == tileNumbers_shotgun) {
+						g_player.ammoShells += 2;
+					} else if (activeGun == tileNumbers_rifle) {
+						g_player.ammoRifle += 1;
+					} else {
+						g_player.ammoBullets += 4;
+					}
 				}
 				if (typeof g_apgManager !== "undefined" && g_apgManager) {
 					g_apgManager.onAmmoPickedUp(this);
 				}
+				soundPickup.play(this.pos);
 			} else {
-				// Map-placed supply crates
+				// D-13: Map-placed stationary supply crates (+8 / +3 / +2)
 				if (this.tileIndex == tileNumbers_boxShells) {
-					g_player.ammoShells += 6;
+					g_player.ammoShells += 3;
 				} else if (this.tileIndex == tileNumbers_boxRifleAmmo) {
-					g_player.ammoRifle += 3;
+					g_player.ammoRifle += 2;
 				} else {
-					g_player.ammoBullets += 12;
+					g_player.ammoBullets += 8;
 				}
+				soundPickup.play(this.pos);
 			}
 
 			if (typeof g_player.clampAmmo === "function") {
 				g_player.clampAmmo();
 			}
-
-			soundPickup.play(this.pos);
 			this.destroy();
 		}
+	}
+
+	render() {
+		let curFrame = typeof frame !== "undefined" ? frame : 0;
+		let maxLife = this.isScavenged ? 1500 : this.twitchUser ? 1800 : Infinity;
+		let remaining = maxLife - (curFrame - this.spawnFrame);
+
+		// D-14, D-15: Final 5-second rapid flashing warning (toggle every 4 frames ~7.5Hz)
+		if (remaining <= 300 && Math.floor(curFrame / 4) % 2 === 0) {
+			return;
+		}
+		super.render();
 	}
 }
 
@@ -4315,7 +4402,12 @@ class MapManager {
 						new Pistol(offsetVec);
 						continue;
 					} else if (t == tileNumbers_shotgun) {
-						new Shotgun(offsetVec);
+						// BAL-21, D-08: Defer shotgun discovery to Level 2+
+						if (g_level < 2) {
+							new MachinePistol(offsetVec);
+						} else {
+							new Shotgun(offsetVec);
+						}
 						continue;
 					} else if (t == tileNumbers_rifle) {
 						new Rifle(offsetVec);
@@ -4330,7 +4422,12 @@ class MapManager {
 						new AmmoBox(offsetVec, tileNumbers_pistol);
 						continue;
 					} else if (t == tileNumbers_boxShells) {
-						new AmmoBox(offsetVec, tileNumbers_shotgun);
+						// BAL-21, D-08: Replace shell crates with bullet crates in Levels 0-1
+						if (g_level < 2) {
+							new AmmoBox(offsetVec, tileNumbers_pistol);
+						} else {
+							new AmmoBox(offsetVec, tileNumbers_shotgun);
+						}
 						continue;
 					} else if (t == tileNumbers_boxRifleAmmo) {
 						new AmmoBox(offsetVec, tileNumbers_rifle);
@@ -5657,11 +5754,25 @@ function gameRenderPost() {
 
 		const bulletCapped = g_player.ammoBullets >= MAX_AMMO_BULLETS;
 		const rifleCapped = g_player.ammoRifle >= MAX_AMMO_RIFLE;
-		const shellCapped = g_player.ammoShells >= MAX_AMMO_SHELLS;
+		const shellCapped = g_player.ammoShells >= MAX_AMMO_SHELLS; // D-09: Triggers at 8 shells
 
-		const bulletCol = bulletCapped ? colorSpark : txtCol;
-		const rifleCol = rifleCapped ? colorSpark : txtCol;
-		const shellCol = shellCapped ? colorSpark : txtCol;
+		let activeGun = g_player.gun ? g_player.gun.tileIndex : tileNumbers_pistol;
+		let isPistolActive = (activeGun !== tileNumbers_shotgun && activeGun !== tileNumbers_rifle);
+		let isShotgunActive = (activeGun === tileNumbers_shotgun);
+		let isRifleActive = (activeGun === tileNumbers_rifle);
+
+		// D-01, D-02: Low-ammo threshold checks on equipped weapon
+		let isLowBullets = isPistolActive && g_player.ammoBullets < 3;
+		let isLowShells = isShotgunActive && g_player.ammoShells < 2;
+		let isLowRifle = isRifleActive && g_player.ammoRifle < 2;
+
+		// D-20: Pulse amber/red at ~5Hz
+		const pulse = 0.5 + 0.5 * Math.sin(frame * 0.2);
+		const pulseCol = new Color(1, 0.2 + 0.45 * pulse, 0.2);
+
+		const bulletCol = bulletCapped ? colorSpark : isLowBullets ? pulseCol : txtCol;
+		const rifleCol = rifleCapped ? colorSpark : isLowRifle ? pulseCol : txtCol;
+		const shellCol = shellCapped ? colorSpark : isLowShells ? pulseCol : txtCol;
 
 		drawText(g_player.ammoBullets, vec2(pos.x - txtDx, y + 0.6 * scaleUI), txtSize, bulletCol, -1, undefined, "right");
 		drawText(g_player.ammoRifle, vec2(pos.x - txtDx, y), txtSize, rifleCol, -1, undefined, "right");
