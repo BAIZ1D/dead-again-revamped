@@ -556,14 +556,42 @@ function gameRenderPost() {
 
 		// ammo
 		if (g_player.gun) {
-			for (let i = 0; i < g_player.gun._maxAmmo; i++) {
-				drawTile(
-					vec2(pos.x - 1.4 * scaleUI + i * 0.95 * scaleUI, pos.y),
-					vec2(scaleUI),
-					g_player.gun._ammoIconTile,
-					TILE_SIZE,
-					i + 1 > g_player.gun.ammo ? colorWhite.scale(0.2) : colorWhite
-				);
+			const maxAmmo = g_player.gun._maxAmmo;
+			const curAmmo = g_player.gun.ammo;
+			const iconTile = g_player.gun._ammoIconTile;
+
+			if (maxAmmo > 6) {
+				// D-01, D-02: Compact 2x10 wrapped grid for high-capacity weapons (Machine Pistol / SMG)
+				// col = i % 10, row = Math.floor(i / 10): Row 0 = top, Row 1 = bottom
+				const bulletScale = vec2(0.52 * scaleUI);
+				const startX = pos.x - 1.45 * scaleUI;
+				const pitchX = 0.50 * scaleUI;
+				const pitchY = 0.54 * scaleUI;
+
+				for (let i = 0; i < maxAmmo; i++) {
+					const col = i % 10;
+					const row = Math.floor(i / 10);
+					const bulletPos = vec2(
+						startX + col * pitchX,
+						pos.y + 0.27 * scaleUI - row * pitchY
+					);
+					// D-03: Spent chambered rounds dim to 20% opacity right-to-left, bottom-to-top
+					// Rounds 19..10 (bottom row) dim first right-to-left, then rounds 9..0 (top row)
+					const isSpent = (i + 1) > curAmmo;
+					const bulletColor = isSpent ? colorWhite.scale(0.2) : colorWhite;
+					drawTile(bulletPos, bulletScale, iconTile, TILE_SIZE, bulletColor);
+				}
+			} else {
+				// D-02: Low-capacity weapons (Pistol <= 6, Shotgun = 2, Rifle = 4) retain single-row large icon layout
+				for (let i = 0; i < maxAmmo; i++) {
+					drawTile(
+						vec2(pos.x - 1.4 * scaleUI + i * 0.95 * scaleUI, pos.y),
+						vec2(scaleUI),
+						iconTile,
+						TILE_SIZE,
+						i + 1 > curAmmo ? colorWhite.scale(0.2) : colorWhite
+					);
+				}
 			}
 		}
 
