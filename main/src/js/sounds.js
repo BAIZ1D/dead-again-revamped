@@ -70,3 +70,9 @@ var soundDivineFlash = new Sound([2.2, 0, 587.33, 0.03, 0.38, 0.65, 0, 1.9, 0.5,
 /// Phase 4 APG Outcome Stingers
 var soundOutcomeGood = new Sound([1.8, 0, 523.25, 0.04, 0.45, 0.75, 0, 1.8, 0, 0, 261.6, 0.08, 0.06, 0, 0, 0, 0.06, 0.88, 0.12, 0.35]);
 var soundOutcomeBad = new Sound([2.4, 0, 85, 0.08, 0.65, 0.95, 3, 2.5, -3, -1, -50, 0.08, 0.12, 1.4, -6, 0.25, 0.1, 0.9, 0.2, 0.35]);
+
+/// Phase 13 Combat Vulnerability & Pacing Escalation Stingers
+
+// Deep biological heartbeat thump for 1 HP danger state (D-05)
+// Low sine wave (shape 0), 60Hz, fast attack 0.01s, quick decay with pitch drop
+var soundHeartbeat = new Sound([1.5, 0, 60, 0.01, 0.05, 0.14, 0, 1.8, -6, 0, 0, 0, 0, 0, 0, 0, 0, 0.65, 0.02, 0]);

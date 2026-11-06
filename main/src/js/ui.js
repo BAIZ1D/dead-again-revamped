@@ -493,7 +493,17 @@ function gameRenderPost() {
 			} else {
 				pipType = g_player.hp >= 4 ? "armor" : "empty";
 			}
-			let pipScale = i === 0 && g_player.hp === 1 ? scaleUI * (1 + 0.18 * Math.sin(frame / 4)) : scaleUI;
+			// Synchronized ~1.2Hz biological double-beat pulse while at 1 HP (D-05)
+			let heartPulse = 0;
+			if (i === 0 && g_player.hp === 1) {
+				let cycle = frame % 50;
+				if (cycle < 12) {
+					heartPulse = 0.28 * Math.sin((cycle / 12) * Math.PI);
+				} else if (cycle >= 14 && cycle < 24) {
+					heartPulse = 0.16 * Math.sin(((cycle - 14) / 10) * Math.PI);
+				}
+			}
+			let pipScale = scaleUI * (1 + heartPulse);
 			uiDrawHeartPipWorld(pipPos, pipScale, pipType);
 		}
 
