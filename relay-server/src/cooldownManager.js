@@ -18,7 +18,8 @@ const ALL_ACTIONS = [
 export class CooldownManager {
   constructor(rateLimits = {}) {
     this.baseCooldownMs = rateLimits.baseCooldownMs ?? 3000;
-    this.bossCooldownMs = rateLimits.bossCooldownMs ?? 8000;
+    this.bossCooldownMs = rateLimits.bossCooldownMs ?? 4000;
+    this.blackoutCooldownMs = rateLimits.blackoutCooldownMs ?? 8000;
     this.userThrottleMs = rateLimits.userThrottleMs ?? 2000;
     this.minCooldownMs = 500;
 
@@ -44,6 +45,7 @@ export class CooldownManager {
   updateConfig(rateLimits = {}) {
     if (typeof rateLimits.baseCooldownMs === 'number') this.baseCooldownMs = rateLimits.baseCooldownMs;
     if (typeof rateLimits.bossCooldownMs === 'number') this.bossCooldownMs = rateLimits.bossCooldownMs;
+    if (typeof rateLimits.blackoutCooldownMs === 'number') this.blackoutCooldownMs = rateLimits.blackoutCooldownMs;
     if (typeof rateLimits.userThrottleMs === 'number') this.userThrottleMs = rateLimits.userThrottleMs;
   }
 
@@ -63,7 +65,12 @@ export class CooldownManager {
 
   getEffectiveCooldown(action, viewerCount = 0, now = Date.now()) {
     const cleanAction = String(action || '').toLowerCase();
-    const cBase = HIGH_IMPACT_ACTIONS.has(cleanAction) ? this.bossCooldownMs : this.baseCooldownMs;
+    let cBase = this.baseCooldownMs;
+    if (cleanAction === 'boss') {
+      cBase = this.bossCooldownMs;
+    } else if (cleanAction === 'blackout') {
+      cBase = this.blackoutCooldownMs;
+    }
     const v = Math.max(0, Number(viewerCount) || 0);
     const chatVelocityFactor = this.getChatVelocityFactor(now);
 
