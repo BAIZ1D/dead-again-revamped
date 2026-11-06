@@ -25,7 +25,8 @@
     "test:phase12": "node scripts/test-phase12.js",
     "test:phase13": "node scripts/test-phase13.js",
     "test:phase15": "node scripts/test-phase15.js",
-    "test:phase16": "node scripts/test-phase16.js"
+    "test:phase16": "node scripts/test-phase16.js",
+    "test:phase17": "node scripts/test-phase17.js"
   },
   "dependencies": {
     "@twurple/api": "^7.2.3",

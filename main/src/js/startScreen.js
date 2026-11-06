@@ -85,6 +85,7 @@ function createShieldPath(cx, cy, w, h) {
 
 // Dynamic Idle Floating Faction Portraits with Faction Auras (D-03)
 function renderStartFactionPortraits(cx, cy, shieldW, u) {
+    if (typeof overlayContext === 'undefined' || !overlayContext) return;
     const portraitRadius = u * 1.35;
     const portraitSize = u * 3.4;
 
@@ -131,6 +132,7 @@ function renderStartFactionPortraits(cx, cy, shieldW, u) {
 
 // Centered Hero Crest: Shield, Crossed Weapons, Faction Portraits, Split Insignia (D-01..D-04)
 function renderStartScreenCrest(cx, cy, u) {
+    if (typeof overlayContext === 'undefined' || !overlayContext) return;
     const shieldW = u * 5.4;
     const shieldH = u * 6.2;
     const crestCenterY = cy - u * 5.8;
@@ -292,6 +294,7 @@ function initStartEmbers(W, H) {
 }
 
 function updateAndRenderStartEmbers(W, H) {
+    if (typeof overlayContext === 'undefined' || !overlayContext) return;
     if (!g_startEmbers || g_startEmbers.length !== 24) initStartEmbers(W, H);
 
     overlayContext.save();
@@ -328,6 +331,7 @@ function updateAndRenderStartEmbers(W, H) {
 
 // CRT Scanline Raster & Dark-Crimson Radial Vignette (D-06)
 function renderStartAtmosphere(W, H, cx, cy) {
+    if (typeof overlayContext === 'undefined' || !overlayContext) return;
     overlayContext.save();
     // 1. Dark-crimson radial lighting vignette
     const R = Math.hypot(cx, cy);
@@ -349,6 +353,7 @@ function renderStartAtmosphere(W, H, cx, cy) {
 
 // "DEAD AGAIN" Layered Chromatic Typography (D-09)
 function renderStartTypography(cx, titleY, u) {
+    if (typeof overlayContext === 'undefined' || !overlayContext) return;
     overlayContext.save();
     const titleSize = Math.max(38, u * 2.8);
     overlayContext.font = `bold ${titleSize}px ${fontDefault}`;
@@ -395,6 +400,7 @@ function renderStartTypography(cx, titleY, u) {
 
 // Subtitle Ribbon Bracket with 4-Second Specular Glint (D-10, D-16)
 function renderStartSubtitleRibbon(cx, subY, subW, subH, u) {
+    if (typeof overlayContext === 'undefined' || !overlayContext) return;
     if (typeof Path2D === 'undefined') return;
     overlayContext.save();
     const halfW = subW / 2;
@@ -452,6 +458,7 @@ function renderStartSubtitleRibbon(cx, subY, subW, subH, u) {
 
 // Interactive Cartouche, Help Button, All-Time Trophy Ledger & Streamer Bracket (D-07, D-08)
 function renderStartScreenBadges(cx, H, u, safeW) {
+    if (typeof overlayContext === 'undefined' || !overlayContext) return;
     overlayContext.save();
 
     // Previous Score Display (if present)
@@ -751,6 +758,7 @@ function renderHelpTabStreamer(x, y, w, h, u) {
 // Tabbed In-Game Field Manual & Streamer Guide (D-11, D-12, D-17)
 function renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH) {
     if (!g_startHelpOpen) return;
+    if (typeof overlayContext === 'undefined' || !overlayContext) return;
 
     overlayContext.save();
 
@@ -833,21 +841,166 @@ function renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH) {
     overlayContext.restore();
 }
 
+// Theatrical Launch Sequence & Audio Triggers (D-14, D-15)
+function triggerStartTheatricalLaunch() {
+    if (g_startLaunchTimer > 0) return;
+    g_startLaunchTimer = Date.now();
+    g_startFlashFrames = 12;
+
+    const sPos = (typeof cameraPos !== 'undefined' && cameraPos) ? cameraPos : vec2(0, 0);
+
+    // Staggered theatrical audio feedback (D-14)
+    if (typeof soundGunReload !== 'undefined' && soundGunReload && soundGunReload.play) {
+        soundGunReload.play(sPos, 1.2, 1.0);
+    }
+    setTimeout(() => {
+        if (typeof soundShotgun !== 'undefined' && soundShotgun && soundShotgun.play) {
+            soundShotgun.play(sPos, 1.5, 0.85);
+        }
+    }, 110);
+    setTimeout(() => {
+        if (typeof soundBossSpawn !== 'undefined' && soundBossSpawn && soundBossSpawn.play) {
+            soundBossSpawn.play(sPos, 1.2, 0.9);
+        } else if (typeof soundEnemyGroan !== 'undefined' && soundEnemyGroan && soundEnemyGroan.play) {
+            soundEnemyGroan.play(sPos, 1.4, 0.6);
+        }
+    }, 220);
+    setTimeout(() => {
+        if (typeof soundDivineFlash !== 'undefined' && soundDivineFlash && soundDivineFlash.play) {
+            soundDivineFlash.play(sPos, 1.0, 1.2);
+        } else if (typeof soundTeamGood !== 'undefined' && soundTeamGood && soundTeamGood.play) {
+            soundTeamGood.play(sPos, 1.0, 1.4);
+        }
+    }, 360);
+}
+
+// Unified Multi-Input Handling (D-13)
 function updateStartScreen() {
-    if (typeof mouseWasReleased !== 'undefined' && (mouseWasReleased(0) || (typeof gamepadWasPressed !== 'undefined' && gamepadWasPressed(0)))) {
-        if (typeof uiSound === 'function') uiSound();
-        if (typeof isTouchDevice !== 'undefined' && isTouchDevice && typeof isFullscreen === 'function' && !isFullscreen()) toggleFullscreen();
-        if (typeof uiFadeOutAndCall === 'function') {
-            uiFadeOutAndCall(() => {
-                startNewGame();
-                enterLobbyState();
-            });
+    const W = mainCanvas ? mainCanvas.width : 1920;
+    const H = mainCanvas ? mainCanvas.height : 1080;
+    const { safeW, safeH, cx, cy, u } = getStartScreenSafeZone(W, H);
+
+    // Flash countdown
+    if (g_startFlashFrames > 0) {
+        g_startFlashFrames--;
+        if (g_startFlashFrames === 0) {
+            if (typeof startNewGame === 'function') startNewGame();
+            if (typeof enterLobbyState === 'function') enterLobbyState();
+            g_startLaunchTimer = 0;
+        }
+        return;
+    }
+
+    const mPos = (typeof mousePosScreen !== 'undefined' && mousePosScreen) ? mousePosScreen : null;
+    const clicked = (typeof mouseWasPressed !== 'undefined') ? mouseWasPressed(0) : false;
+
+    if (g_startHelpOpen) {
+        // Field Manual Modal Input Routing
+        const modalW = Math.min(safeW * 0.92, 1020);
+        const modalH = Math.min(safeH * 0.86, 680);
+        const modalX = cx - modalW / 2;
+        const modalY = cy - modalH / 2;
+        const headerY = modalY + u * 1.4;
+        const tabY = headerY + u * 1.5;
+        const tabH = u * 1.6;
+        const tabW = (modalW - u * 2.0) / 3;
+
+        // Mouse click on tabs
+        if (clicked && mPos) {
+            for (let i = 0; i < 3; i++) {
+                const tx = modalX + u * 1.0 + i * tabW;
+                if (mPos.x >= tx && mPos.x <= tx + tabW - 4 && mPos.y >= tabY - tabH / 2 && mPos.y <= tabY + tabH / 2) {
+                    g_startHelpTab = i;
+                    if (typeof soundCountdownBeep !== 'undefined' && soundCountdownBeep.play) soundCountdownBeep.play();
+                    return;
+                }
+            }
+            // Close button / backdrop click
+            if (mPos.x < modalX || mPos.x > modalX + modalW || mPos.y < modalY || mPos.y > modalY + modalH || (mPos.y <= modalY + u * 2.2 && mPos.x >= modalX + modalW - u * 8.0)) {
+                g_startHelpOpen = false;
+                return;
+            }
+        }
+
+        // Keyboard: 1, 2, 3, Left/Right arrows, Esc, H
+        if (typeof keyWasPressed !== 'undefined') {
+            if (keyWasPressed(49)) g_startHelpTab = 0; // '1'
+            if (keyWasPressed(50)) g_startHelpTab = 1; // '2'
+            if (keyWasPressed(51)) g_startHelpTab = 2; // '3'
+            if (keyWasPressed(37)) g_startHelpTab = (g_startHelpTab + 2) % 3; // Left Arrow
+            if (keyWasPressed(39)) g_startHelpTab = (g_startHelpTab + 1) % 3; // Right Arrow
+            if (keyWasPressed(27) || keyWasPressed(72)) { // Esc or 'H'
+                g_startHelpOpen = false;
+                return;
+            }
+        }
+
+        // Gamepad: LB (4) / RB (5) switch tabs, B (1) / Y (3) close
+        if (typeof gamepadWasPressed !== 'undefined') {
+            if (gamepadWasPressed(4)) g_startHelpTab = (g_startHelpTab + 2) % 3;
+            if (gamepadWasPressed(5)) g_startHelpTab = (g_startHelpTab + 1) % 3;
+            if (gamepadWasPressed(1) || gamepadWasPressed(3)) {
+                g_startHelpOpen = false;
+                return;
+            }
+        }
+        return;
+    }
+
+    // Start Screen Input Routing (Modal closed)
+    const ctaY = H * 0.74;
+    const ctaW = Math.min(safeW * 0.65, u * 17);
+    const ctaH = u * 2.3;
+
+    const guideY = H * 0.83;
+    const guideW = Math.min(safeW * 0.50, u * 15);
+    const guideH = u * 1.7;
+
+    // Mouse click detection
+    if (clicked && mPos) {
+        // Clicked Help Button
+        if (Math.abs(mPos.x - cx) < guideW / 2 && Math.abs(mPos.y - guideY) < guideH / 2) {
+            g_startHelpOpen = true;
+            if (typeof soundCountdownBeep !== 'undefined' && soundCountdownBeep.play) soundCountdownBeep.play();
+            return;
+        }
+        // Clicked CTA Cartouche
+        if (Math.abs(mPos.x - cx) < ctaW / 2 && Math.abs(mPos.y - ctaY) < ctaH / 2) {
+            triggerStartTheatricalLaunch();
+            return;
+        }
+    }
+
+    // Keyboard: Enter (13) or Space (32) starts; H (72) opens Help
+    if (typeof keyWasPressed !== 'undefined') {
+        if (keyWasPressed(13) || keyWasPressed(32)) {
+            triggerStartTheatricalLaunch();
+            return;
+        }
+        if (keyWasPressed(72)) {
+            g_startHelpOpen = true;
+            if (typeof soundCountdownBeep !== 'undefined' && soundCountdownBeep.play) soundCountdownBeep.play();
+            return;
+        }
+    }
+
+    // Gamepad: A (0) starts; Y (3) opens Help
+    if (typeof gamepadWasPressed !== 'undefined') {
+        if (gamepadWasPressed(0)) {
+            triggerStartTheatricalLaunch();
+            return;
+        }
+        if (gamepadWasPressed(3)) {
+            g_startHelpOpen = true;
+            if (typeof soundCountdownBeep !== 'undefined' && soundCountdownBeep.play) soundCountdownBeep.play();
+            return;
         }
     }
 }
 
+// Master Render Entry Point: Isolated inside save() and restore() (D-09)
 function renderStartScreen() {
-    if (typeof overlayContext === 'undefined' || !overlayContext) return;
+    if (!overlayContext) return;
     const W = mainCanvas ? mainCanvas.width : 1920;
     const H = mainCanvas ? mainCanvas.height : 1080;
     const { safeW, safeH, cx, cy, u } = getStartScreenSafeZone(W, H);
@@ -879,6 +1032,13 @@ function renderStartScreen() {
     // 7. Field Manual Modal Overlay (if active, D-11, D-12)
     if (g_startHelpOpen) {
         renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH);
+    }
+
+    // 8. 12-Frame Transition Flash Wipe (D-15)
+    if (g_startFlashFrames > 0) {
+        const flashAlpha = g_startFlashFrames / 12;
+        overlayContext.fillStyle = `rgba(255, 255, 255, ${flashAlpha * 0.85})`;
+        overlayContext.fillRect(0, 0, W, H);
     }
 
     overlayContext.restore();
