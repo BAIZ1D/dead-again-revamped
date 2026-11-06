@@ -5,7 +5,7 @@
 <h3 align="center">Retro Top-Down Zombie Survival Shooter with Native Twitch Audience Participation</h3>
 
 <p align="center">
-  <a href="https://github.com/BAIZ1D/dead-again-revamped/releases"><img src="https://img.shields.io/badge/Release-v1.0.0-9146FF?style=flat-square" alt="Version 1.0.0"></a>
+  <a href="https://github.com/BAIZ1D/dead-again-revamped/releases"><img src="https://img.shields.io/badge/Release-v1.0.1-9146FF?style=flat-square" alt="Version 1.0.1"></a>
   <a href="#downloads-and-releases"><img src="https://img.shields.io/badge/Platform-macOS%20Universal%20%7C%20Windows%20x64-2ea44f?style=flat-square" alt="macOS and Windows"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GNU%20AGPL%20v3.0-blue?style=flat-square" alt="GNU AGPLv3"></a>
   <a href="LICENSE-THIRD-PARTY.txt"><img src="https://img.shields.io/badge/Third--Party-MIT%20Permissive-lightgrey?style=flat-square" alt="MIT License"></a>

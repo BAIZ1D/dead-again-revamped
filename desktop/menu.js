@@ -13,7 +13,7 @@ export function setupMenu(windowManager) {
   if (isMac && app.setAboutPanelOptions) {
     app.setAboutPanelOptions({
       applicationName: 'Dead Again - Revamped (Twitch Edition)',
-      applicationVersion: app.getVersion ? app.getVersion() : '1.0.0',
+      applicationVersion: app.getVersion ? app.getVersion() : '1.0.1',
       copyright: 'Dead Again - Revamped © 2026 Baizid Al Hamid',
       credits: 'Developed by Baizid Al Hamid'
     });
@@ -55,7 +55,7 @@ export function setupMenu(windowManager) {
             if (res && !res.updateAvailable && !res.error) {
               dialog.showMessageBox({
                 title: 'Dead Again - Revamped',
-                message: 'You are running the latest version (' + (app.getVersion ? app.getVersion() : '1.0.0') + ').',
+                message: 'You are running the latest version (' + (app.getVersion ? app.getVersion() : '1.0.1') + ').',
                 buttons: ['OK']
               });
             }
@@ -138,7 +138,7 @@ export function setupMenu(windowManager) {
             dialog.showMessageBox({
               type: 'info',
               title: 'Dead Again - Revamped (Twitch Edition)',
-              message: 'Dead Again - Revamped (Twitch Edition) v' + (app.getVersion ? app.getVersion() : '1.0.0') + '\n\nDeveloped by Baizid Al Hamid\n\n100% Free & Open Source.',
+              message: 'Dead Again - Revamped (Twitch Edition) v' + (app.getVersion ? app.getVersion() : '1.0.1') + '\n\nDeveloped by Baizid Al Hamid\n\n100% Free & Open Source.',
               buttons: ['OK']
             });
           }

@@ -21,9 +21,9 @@ function getLocalVersion() {
   }
   try {
     const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
-    return pkg.version || '1.0.0';
+    return pkg.version || '1.0.1';
   } catch (_) {
-    return '1.0.0';
+    return '1.0.1';
   }
 }
 
@@ -66,7 +66,7 @@ export function compareSemver(vRemote, vLocal) {
 /**
  * Check latest release from GitHub Releases API with strict 3s timeout and silent error handling.
  */
-export async function checkLatestRelease(repoOwnerRepo = 'BAIZ1D/dead-again-revamped', currentVersion = '1.0.0') {
+export async function checkLatestRelease(repoOwnerRepo = 'BAIZ1D/dead-again-revamped', currentVersion = '1.0.1') {
   const curVer = currentVersion || getLocalVersion();
   try {
     const url = (typeof repoOwnerRepo === 'string' && (repoOwnerRepo.startsWith('http://') || repoOwnerRepo.startsWith('https://')))

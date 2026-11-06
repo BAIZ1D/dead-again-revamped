@@ -1,6 +1,6 @@
 {
   "name": "apg-relay-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Twitch IRC & Helix WebSocket Relay Server and Simulator Dashboard",
   "type": "module",
   "main": "src/index.js"
