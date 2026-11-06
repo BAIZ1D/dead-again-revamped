@@ -21,7 +21,8 @@
     "pack:win": "node scripts/build-game.js && node scripts/generate-icons.js && electron-builder --win --x64 --publish never",
     "dist": "node scripts/build-game.js && node scripts/generate-icons.js && electron-builder --publish never",
     "test:packaging": "node scripts/test-phase9-packaging.js",
-    "test:distribution": "node scripts/test-phase9-distribution.js"
+    "test:distribution": "node scripts/test-phase9-distribution.js",
+    "test:phase12": "node scripts/test-phase12.js"
   },
   "dependencies": {
     "@twurple/api": "^7.2.3",
