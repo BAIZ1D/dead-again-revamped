@@ -2895,7 +2895,7 @@ class APGManager {
 		}
 	}
 
-	renderKarmaMeter(W, H, cx, u) {
+	renderKarmaMeter(W, H, cx, u, alpha = 1.0) {
 		let total = this.goodActions + this.badActions;
 		let liveGoodPct = total === 0 ? 50 : Math.round((this.goodActions / total) * 100);
 		let liveBadPct = 100 - liveGoodPct;
@@ -2908,53 +2908,55 @@ class APGManager {
 				? g_apgNetwork.lockedPrediction.goodPct
 				: 50;
 
-		let barY = Math.max(26, u * 1.65);
+		let meterAlpha = typeof alpha === "number" ? alpha : 1.0;
+		let barY = Math.round(H - Math.max(24, u * 1.5));
 		let barW = Math.min(W * 0.42, u * 21);
 		let barH = Math.max(16, u * 1.15);
 		let barLeft = cx - barW / 2;
 		let barRight = cx + barW / 2;
 
 		// Outer frame & background track
-		uiDrawRectScreen(vec2(cx, barY), vec2(barW + 4, barH + 4), colorWhite.scale(0.35));
-		uiDrawRectScreen(vec2(cx, barY), vec2(barW, barH), colorBlack);
+		uiDrawRectScreen(vec2(cx, barY), vec2(barW + 4, barH + 4), colorWhite.scale(0.35 * meterAlpha));
+		uiDrawRectScreen(vec2(cx, barY), vec2(barW, barH), new Color(0, 0, 0, 0.85 * meterAlpha));
 
 		// Good (Left) and Bad (Right) fills
 		let goodW = barW * (dispGood / 100);
 		let badW = barW * (dispBad / 100);
 		if (goodW > 0) {
-			uiDrawRectScreen(vec2(barLeft + goodW / 2, barY), vec2(goodW, barH), colorZombie);
+			uiDrawRectScreen(vec2(barLeft + goodW / 2, barY), vec2(goodW, barH), colorZombie.scale(meterAlpha));
 		}
 		if (badW > 0) {
-			uiDrawRectScreen(vec2(barRight - badW / 2, barY), vec2(badW, barH), colorBlood);
+			uiDrawRectScreen(vec2(barRight - badW / 2, barY), vec2(badW, barH), colorBlood.scale(meterAlpha));
 		}
-		uiDrawRectScreen(vec2(cx, barY), vec2(1, barH), colorBlack);
+		uiDrawRectScreen(vec2(cx, barY), vec2(1, barH), new Color(0, 0, 0, meterAlpha));
 
 		// Frame ends with mini pixel portraits from t.png
 		let portraitSize = vec2(Math.max(18, u * 1.55));
-		uiDrawTileScreen(vec2(barLeft - u * 1.15, barY), portraitSize, tileNumbers_facePlayer, colorWhite, false);
+		uiDrawTileScreen(vec2(barLeft - u * 1.15, barY), portraitSize, tileNumbers_facePlayer, colorWhite.scale(meterAlpha), false);
 		let badFaceTile =
 			typeof g_level !== "undefined" && g_level % 5 === 2 ? tileNumbers_faceVampire : tileNumbers_faceZombie;
-		uiDrawTileScreen(vec2(barRight + u * 1.15, barY), portraitSize, badFaceTile, colorWhite, true);
+		uiDrawTileScreen(vec2(barRight + u * 1.15, barY), portraitSize, badFaceTile, colorWhite.scale(meterAlpha), true);
 
 		// Golden Locked-Prediction Target Pin (D-20)
 		let pinX = barLeft + barW * (clamp(targetGoodPct, 0, 100) / 100);
-		uiDrawRectScreen(vec2(pinX, barY), vec2(3, barH + 8), colorSpark);
-		uiDrawRectScreen(vec2(pinX, barY - barH * 0.55), vec2(7, 3), colorSpark);
+		uiDrawRectScreen(vec2(pinX, barY), vec2(3, barH + 8), colorSpark.scale(meterAlpha));
+		uiDrawRectScreen(vec2(pinX, barY - barH * 0.55), vec2(7, 3), colorSpark.scale(meterAlpha));
 
 		// Inner text
 		let leftLabel = "GOOD " + liveGoodPct + "% (" + this.goodActions + ")";
 		let rightLabel = "(" + this.badActions + ") " + liveBadPct + "% BAD";
-		drawTextWithOutline(leftLabel, vec2(barLeft + barW * 0.25, barY), u * 0.62, colorWhite, 2, colorBlack);
-		drawTextWithOutline(rightLabel, vec2(barRight - barW * 0.25, barY), u * 0.62, colorWhite, 2, colorBlack);
+		drawTextWithOutline(leftLabel, vec2(barLeft + barW * 0.25, barY), u * 0.62, colorWhite.scale(meterAlpha), 2, new Color(0, 0, 0, meterAlpha));
+		drawTextWithOutline(rightLabel, vec2(barRight - barW * 0.25, barY), u * 0.62, colorWhite.scale(meterAlpha), 2, new Color(0, 0, 0, meterAlpha));
 
-		// Target & Lead status line (D-20)
+		// Target & Lead status line (D-16, D-20) - stacked directly above bar
+		let statusY = barY - Math.max(16, u * 1.05);
 		let goodLeading = liveGoodPct >= targetGoodPct;
 		let statusText = "TARGET: " + targetGoodPct + "% GOOD  |  " + (goodLeading ? "▲ GOOD LEADING" : "▼ BAD LEADING");
 		let statusCol = goodLeading ? colorZombie : colorBlood;
-		drawTextWithOutline(statusText, vec2(cx, barY + barH * 0.92), u * 0.66, statusCol, 2, colorBlack);
+		drawTextWithOutline(statusText, vec2(cx, statusY), u * 0.66, statusCol.scale(meterAlpha), 2, new Color(0, 0, 0, meterAlpha));
 	}
 
-	renderActiveTimerPills(W, H, cx, u) {
+	renderActiveTimerPills(W, H, cx, u, alpha = 1.0) {
 		let pills = [];
 		if (this.timers.light > 0) {
 			pills.push({ text: "★ LIGHT " + (this.timers.light / 60).toFixed(1) + "s", col: colorSpark });
@@ -2978,9 +2980,11 @@ class APGManager {
 			pills.push({ text: "⚠ JAMMED", col: colorBlood });
 		}
 
-		let barY = Math.max(26, u * 1.65);
-		let barH = Math.max(16, u * 1.15);
-		let py = barY + barH * 0.92 + u * 1.15;
+		let pillAlpha = typeof alpha === "number" ? alpha : 1.0;
+		let barY = Math.round(H - Math.max(24, u * 1.5));
+		let statusY = barY - Math.max(16, u * 1.05);
+		let py = statusY - Math.max(18, u * 1.15); // Stacked above status line (~H - 58px)
+		let clutchY = pills.length > 0 ? py - Math.max(16, u * 1.05) : statusY - Math.max(16, u * 1.05);
 
 		if (pills.length > 0) {
 			let pillWidths = [];
@@ -2997,8 +3001,8 @@ class APGManager {
 			for (let i = 0; i < pills.length; i++) {
 				let pw = pillWidths[i];
 				let px = currX + pw / 2;
-				uiDrawRectScreen(vec2(px, py), vec2(pw, u * 0.82), new Color(0, 0, 0, 0.78));
-				drawTextWithOutline(pills[i].text, vec2(px, py), u * 0.6, pills[i].col, 2, colorBlack);
+				uiDrawRectScreen(vec2(px, py), vec2(pw, u * 0.82), new Color(0, 0, 0, 0.78 * pillAlpha));
+				drawTextWithOutline(pills[i].text, vec2(px, py), u * 0.6, pills[i].col.scale(pillAlpha), 2, new Color(0, 0, 0, pillAlpha));
 				currX += pw + spacing;
 			}
 		}
@@ -3011,17 +3015,16 @@ class APGManager {
 			);
 			let clutchBarW = Math.min(W * 0.38, u * 18);
 			let clutchBarH = Math.max(12, u * 0.85);
-			let clutchY = pills.length > 0 ? py + u * 1.15 : barY + barH * 0.92 + u * 1.25;
 
-			uiDrawRectScreen(vec2(cx, clutchY), vec2(clutchBarW + 2, clutchBarH + 2), colorSpark);
-			uiDrawRectScreen(vec2(cx, clutchY), vec2(clutchBarW, clutchBarH), new Color(0.1, 0.05, 0, 0.88));
+			uiDrawRectScreen(vec2(cx, clutchY), vec2(clutchBarW + 2, clutchBarH + 2), colorSpark.scale(pillAlpha));
+			uiDrawRectScreen(vec2(cx, clutchY), vec2(clutchBarW, clutchBarH), new Color(0.1, 0.05, 0, 0.88 * pillAlpha));
 
 			let fillW = clutchBarW * (clutchPct / 100);
 			if (fillW > 0) {
-				uiDrawRectScreen(vec2(cx - clutchBarW / 2 + fillW / 2, clutchY), vec2(fillW, clutchBarH), colorSpark);
+				uiDrawRectScreen(vec2(cx - clutchBarW / 2 + fillW / 2, clutchY), vec2(fillW, clutchBarH), colorSpark.scale(pillAlpha));
 			}
 			let clutchText = "⚡ CLUTCH CHARGING: " + clutchPct + "%";
-			drawTextWithOutline(clutchText, vec2(cx, clutchY), u * 0.62, colorWhite, 2, colorBlack);
+			drawTextWithOutline(clutchText, vec2(cx, clutchY), u * 0.62, colorWhite.scale(pillAlpha), 2, new Color(0, 0, 0, pillAlpha));
 		}
 	}
 
@@ -3135,9 +3138,21 @@ class APGManager {
 		const cx = W / 2;
 		const u = Math.max(11, Math.min(W, H) / 42);
 
+		let targetAlpha = 1.0;
+		if (typeof g_player !== "undefined" && g_player && g_player.hp > 0) {
+			let playerScreen = worldToScreen(g_player.pos);
+			let dist = playerScreen.distance(vec2(cx, H - 35));
+			if (dist < 110) {
+				targetAlpha = 0.35 + 0.65 * clamp(dist / 110, 0, 1);
+			}
+		}
+		this.bottomHudAlpha = this.bottomHudAlpha !== undefined ? this.bottomHudAlpha : 1.0;
+		this.bottomHudAlpha += (targetAlpha - this.bottomHudAlpha) * 0.15;
+		let alpha = this.bottomHudAlpha;
+
 		this.renderWorldLabels(W, H, u);
-		this.renderKarmaMeter(W, H, cx, u);
-		this.renderActiveTimerPills(W, H, cx, u);
+		this.renderKarmaMeter(W, H, cx, u, alpha);
+		this.renderActiveTimerPills(W, H, cx, u, alpha);
 		this.renderToastsAndCharges(W, H, u);
 		this.renderCenterBanner(W, H, cx, u);
 		this.renderAmbientTelegraphVignette(W, H, cx);
