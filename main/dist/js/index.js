@@ -6064,6 +6064,285 @@ function renderStartScreenBadges(cx, H, u, safeW) {
     overlayContext.restore();
 }
 
+// Tab 1: Weapon Stat Cards & Health Telemetry
+function renderHelpTabWeapons(x, y, w, h, u) {
+    const cardW = (w - u * 0.8) / 2;
+    const cardH = (h - u * 1.8) / 2;
+
+    const weapons = [
+        {
+            name: "SERVICE PISTOL",
+            tile: tileNumbers_pistol,
+            mag: "6 Rounds (Single Row)",
+            cap: "36 Bullets Reserve",
+            desc: "Balanced sidearm. Precision semi-auto fire with crisp trigger reset."
+        },
+        {
+            name: "MACHINE PISTOL (SMG)",
+            tile: tileNumbers_smg,
+            mag: "20 Rounds (2x10 Grid)",
+            cap: "36 Bullets Reserve",
+            desc: "Rapid spray (12.5 rps) with hold bloom; tap burst for pinpoint accuracy."
+        },
+        {
+            name: "COMBAT SHOTGUN",
+            tile: tileNumbers_shotgun,
+            mag: "2 Heavy Shells",
+            cap: "8 Shells Reserve",
+            desc: "High close-range lethality with wide pellet spread. Scarcity-tuned."
+        },
+        {
+            name: "HUNTING RIFLE",
+            tile: tileNumbers_rifle,
+            mag: "4 Rounds",
+            cap: "8 Rounds Reserve",
+            desc: "Piercing long-range stopping power. Heavy knockdown against bosses."
+        }
+    ];
+
+    for (let i = 0; i < 4; i++) {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const cx = x + col * (cardW + u * 0.8);
+        const cy = y + row * (cardH + u * 0.6);
+        const wep = weapons[i];
+
+        overlayContext.fillStyle = 'rgba(22, 27, 34, 0.75)';
+        overlayContext.fillRect(cx, cy, cardW, cardH);
+        overlayContext.strokeStyle = 'rgba(212, 175, 55, 0.35)';
+        overlayContext.strokeRect(cx, cy, cardW, cardH);
+
+        // Weapon Tile
+        drawOverlayTile(wep.tile, cx + u * 1.5, cy + cardH * 0.35, u * 2.8, 0, false, 1.0);
+
+        // Weapon Title & Details
+        overlayContext.font = `bold ${Math.max(11, u * 0.62)}px ${fontDefault}`;
+        overlayContext.textAlign = 'left';
+        overlayContext.fillStyle = '#FBF236';
+        overlayContext.fillText(wep.name, cx + u * 3.4, cy + u * 0.8);
+
+        overlayContext.font = `bold ${Math.max(9, u * 0.46)}px ${fontDefault}`;
+        overlayContext.fillStyle = '#D4AF37';
+        overlayContext.fillText(`MAG: ${wep.mag} | CAP: ${wep.cap}`, cx + u * 3.4, cy + u * 1.6);
+
+        overlayContext.font = `${Math.max(9, u * 0.44)}px ${fontDefault}`;
+        overlayContext.fillStyle = '#C8D1DC';
+        overlayContext.fillText(wep.desc, cx + u * 0.8, cy + cardH - u * 0.5);
+    }
+
+    // Health Telemetry Footer
+    const footY = y + cardH * 2 + u * 0.9;
+    overlayContext.font = `bold ${Math.max(10, u * 0.52)}px ${fontDefault}`;
+    overlayContext.textAlign = 'left';
+    overlayContext.fillStyle = '#FF4D4D';
+    overlayContext.fillText("HEALTH & SURVIVAL: 3 Base Hearts + 1 Golden Shield Pip. 1 HP triggers critical danger pulse.", x + u * 0.5, footY);
+}
+
+// Tab 2: Twitch APG Karma, Commands & Mob Threat Cards
+function renderHelpTabTwitch(x, y, w, h, u) {
+    // Karma Meter Explanation
+    overlayContext.font = `bold ${Math.max(11, u * 0.62)}px ${fontDefault}`;
+    overlayContext.textAlign = 'left';
+    overlayContext.fillStyle = '#FBF236';
+    overlayContext.fillText("TWITCH TUG-OF-WAR KARMA ENGINE", x, y + u * 0.6);
+
+    overlayContext.font = `${Math.max(9, u * 0.46)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#C8D1DC';
+    overlayContext.fillText("Audience votes & chat events shift the live Karma balance between GOOD (Survivor) and BAD (Horde).", x, y + u * 1.3);
+
+    // Command Cheat Sheet Box
+    const cmdY = y + u * 2.0;
+    const cmdH = u * 3.8;
+    overlayContext.fillStyle = 'rgba(22, 27, 34, 0.75)';
+    overlayContext.fillRect(x, cmdY, w, cmdH);
+    overlayContext.strokeStyle = 'rgba(212, 175, 55, 0.35)';
+    overlayContext.strokeRect(x, cmdY, w, cmdH);
+
+    overlayContext.font = `bold ${Math.max(10, u * 0.52)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#4ADE80';
+    overlayContext.fillText("GOOD TEAM COMMANDS: !buff (Speed/Damage), !drop / !ammo (Supply Drop), !heal (Clutch Shield)", x + u * 0.8, cmdY + u * 1.0);
+
+    overlayContext.fillStyle = '#FF4D4D';
+    overlayContext.fillText("BAD TEAM COMMANDS: !sabotage (Jam Gun), !frenzy (Blood Surge), !zombie (Spawn Horde)", x + u * 0.8, cmdY + u * 2.2);
+
+    overlayContext.fillStyle = '#9146FF';
+    overlayContext.fillText("CLUTCH EVENTS: Karma ≥85% unlocks DIVINE FLASH (Board Stun) or BLOOD SURGE (Nightmare Swarm)", x + u * 0.8, cmdY + u * 3.2);
+
+    // Mob Threat Cards
+    const mobY = cmdY + cmdH + u * 0.8;
+    overlayContext.font = `bold ${Math.max(11, u * 0.58)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#FBF236';
+    overlayContext.fillText("MOB THREAT INTEL", x, mobY);
+
+    const mobs = [
+        { name: "ZOMBIE", speed: "Normal", threat: "Swarm", face: tileNumbers_faceZombie },
+        { name: "VAMPIRE", speed: "Very Fast", threat: "Flanker", face: tileNumbers_faceVampire },
+        { name: "GHOST", speed: "Phasing", threat: "Wall-Clipper", face: tileNumbers_ghost }
+    ];
+
+    const mCardW = (w - u * 0.8) / 3;
+    for (let i = 0; i < 3; i++) {
+        const mx = x + i * (mCardW + u * 0.4);
+        const my = mobY + u * 0.4;
+        const mob = mobs[i];
+
+        overlayContext.fillStyle = 'rgba(22, 27, 34, 0.65)';
+        overlayContext.fillRect(mx, my, mCardW, u * 3.0);
+        overlayContext.strokeStyle = 'rgba(172, 50, 50, 0.45)';
+        overlayContext.strokeRect(mx, my, mCardW, u * 3.0);
+
+        drawOverlayTile(mob.face, mx + u * 1.0, my + u * 1.5, u * 2.0, 0, false, 1.0);
+
+        overlayContext.font = `bold ${Math.max(10, u * 0.50)}px ${fontDefault}`;
+        overlayContext.fillStyle = '#FF4D4D';
+        overlayContext.fillText(mob.name, mx + u * 2.4, my + u * 1.0);
+
+        overlayContext.font = `${Math.max(9, u * 0.42)}px ${fontDefault}`;
+        overlayContext.fillStyle = '#C8D1DC';
+        overlayContext.fillText(`SPEED: ${mob.speed}`, mx + u * 2.4, my + u * 1.8);
+        overlayContext.fillText(`TACTIC: ${mob.threat}`, mx + u * 2.4, my + u * 2.5);
+    }
+}
+
+// Tab 3: Streamer Dashboard & OBS Integration
+function renderHelpTabStreamer(x, y, w, h, u) {
+    overlayContext.font = `bold ${Math.max(11, u * 0.62)}px ${fontDefault}`;
+    overlayContext.textAlign = 'left';
+    overlayContext.fillStyle = '#FBF236';
+    overlayContext.fillText("STREAMER SETUP & BROADCAST INSTRUCTIONS", x, y + u * 0.6);
+
+    const cardH = (h - u * 1.5) / 3;
+
+    // Card 1: Dashboard Shortcut
+    overlayContext.fillStyle = 'rgba(22, 27, 34, 0.75)';
+    overlayContext.fillRect(x, y + u * 1.2, w, cardH);
+    overlayContext.strokeStyle = 'rgba(145, 70, 255, 0.55)';
+    overlayContext.strokeRect(x, y + u * 1.2, w, cardH);
+
+    overlayContext.font = `bold ${Math.max(10, u * 0.55)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#9146FF';
+    overlayContext.fillText("1. STREAMER DASHBOARD (Cmd+D / Ctrl+D)", x + u * 0.8, y + u * 2.1);
+
+    overlayContext.font = `${Math.max(9, u * 0.46)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#C8D1DC';
+    overlayContext.fillText("Open the companion dashboard to view live prediction wagers, trigger manual clutches, or simulate audience events.", x + u * 0.8, y + u * 2.9);
+
+    // Card 2: Prediction Lifecycle
+    const y2 = y + u * 1.2 + cardH + u * 0.4;
+    overlayContext.fillStyle = 'rgba(22, 27, 34, 0.75)';
+    overlayContext.fillRect(x, y2, w, cardH);
+    overlayContext.strokeStyle = 'rgba(212, 175, 55, 0.35)';
+    overlayContext.strokeRect(x, y2, w, cardH);
+
+    overlayContext.font = `bold ${Math.max(10, u * 0.55)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#FBF236';
+    overlayContext.fillText("2. CHANNEL POINTS PREDICTION LIFECYCLE", x + u * 0.8, y2 + u * 0.9);
+
+    overlayContext.font = `${Math.max(9, u * 0.46)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#C8D1DC';
+    overlayContext.fillText("Lobby opens prediction -> Locked on level start -> Automatically resolves payouts upon Victory or Player Death.", x + u * 0.8, y2 + u * 1.7);
+
+    // Card 3: OBS Studio Capture
+    const y3 = y2 + cardH + u * 0.4;
+    overlayContext.fillStyle = 'rgba(22, 27, 34, 0.75)';
+    overlayContext.fillRect(x, y3, w, cardH);
+    overlayContext.strokeStyle = 'rgba(74, 222, 128, 0.45)';
+    overlayContext.strokeRect(x, y3, w, cardH);
+
+    overlayContext.font = `bold ${Math.max(10, u * 0.55)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#4ADE80';
+    overlayContext.fillText("3. ZERO-OVERLAY OBS CAPTURE", x + u * 0.8, y3 + u * 0.9);
+
+    overlayContext.font = `${Math.max(9, u * 0.46)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#C8D1DC';
+    overlayContext.fillText("No external browser sources or overlays required. Add a Window/Game Capture in OBS targeting Dead Again.", x + u * 0.8, y3 + u * 1.7);
+}
+
+// Tabbed In-Game Field Manual & Streamer Guide (D-11, D-12, D-17)
+function renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH) {
+    if (!g_startHelpOpen) return;
+
+    overlayContext.save();
+
+    // 1. Dark Backdrop Dimming
+    overlayContext.fillStyle = 'rgba(5, 2, 4, 0.78)';
+    overlayContext.fillRect(0, 0, W, H);
+
+    // 2. Terminal Card Container
+    const modalW = Math.min(safeW * 0.92, 1020);
+    const modalH = Math.min(safeH * 0.86, 680);
+    const modalX = cx - modalW / 2;
+    const modalY = cy - modalH / 2;
+
+    // Dark slate backdrop
+    overlayContext.fillStyle = 'rgba(16, 20, 26, 0.96)';
+    overlayContext.fillRect(modalX, modalY, modalW, modalH);
+
+    // Gold border with corner rivets
+    overlayContext.strokeStyle = '#D4AF37';
+    overlayContext.lineWidth = 2.0;
+    overlayContext.strokeRect(modalX, modalY, modalW, modalH);
+
+    // 3. Modal Header
+    const headerY = modalY + u * 1.4;
+    overlayContext.font = `bold ${Math.max(14, u * 0.88)}px ${fontDefault}`;
+    overlayContext.textAlign = 'left';
+    overlayContext.textBaseline = 'middle';
+    overlayContext.fillStyle = '#FBF236';
+    overlayContext.fillText("★ SURVIVOR FIELD MANUAL & STREAMER GUIDE", modalX + u * 1.0, headerY);
+
+    overlayContext.font = `bold ${Math.max(11, u * 0.58)}px ${fontDefault}`;
+    overlayContext.textAlign = 'right';
+    overlayContext.fillStyle = '#E8DDFF';
+    overlayContext.fillText("[ESC / X] RETURN TO START", modalX + modalW - u * 1.0, headerY);
+
+    // 4. Tab Header Navigation Bar
+    const tabY = headerY + u * 1.5;
+    const tabH = u * 1.6;
+    const tabW = (modalW - u * 2.0) / 3;
+    const tabTitles = [
+        "1. COMBAT & WEAPONS",
+        "2. TWITCH APG & KARMA",
+        "3. STREAMER SETUP"
+    ];
+
+    for (let i = 0; i < 3; i++) {
+        const tx = modalX + u * 1.0 + i * tabW;
+        const isActive = (g_startHelpTab === i);
+
+        overlayContext.fillStyle = isActive ? 'rgba(212, 175, 55, 0.22)' : 'rgba(22, 27, 34, 0.60)';
+        overlayContext.fillRect(tx, tabY - tabH / 2, tabW - 4, tabH);
+
+        overlayContext.strokeStyle = isActive ? '#FBF236' : 'rgba(212, 175, 55, 0.35)';
+        overlayContext.lineWidth = isActive ? 2.0 : 1.0;
+        overlayContext.strokeRect(tx, tabY - tabH / 2, tabW - 4, tabH);
+
+        overlayContext.font = `bold ${Math.max(10, u * 0.55)}px ${fontDefault}`;
+        overlayContext.textAlign = 'center';
+        overlayContext.fillStyle = isActive ? '#FFFFFF' : '#B0B8C4';
+        overlayContext.fillText(tabTitles[i], tx + (tabW - 4) / 2, tabY);
+    }
+
+    // 5. Tab Content Area
+    const contentY = tabY + tabH / 2 + u * 0.6;
+    const contentH = modalH - (contentY - modalY) - u * 0.8;
+    const contentW = modalW - u * 2.0;
+    const contentX = modalX + u * 1.0;
+
+    if (g_startHelpTab === 0) {
+        // TAB 1: COMBAT & WEAPONS (D-11, D-12, BAL-23, CLIP-01)
+        renderHelpTabWeapons(contentX, contentY, contentW, contentH, u);
+    } else if (g_startHelpTab === 1) {
+        // TAB 2: TWITCH APG & AUDIENCE (D-11, D-12)
+        renderHelpTabTwitch(contentX, contentY, contentW, contentH, u);
+    } else {
+        // TAB 3: STREAMER SETUP (D-11)
+        renderHelpTabStreamer(contentX, contentY, contentW, contentH, u);
+    }
+
+    overlayContext.restore();
+}
+
 function updateStartScreen() {
     if (typeof mouseWasReleased !== 'undefined' && (mouseWasReleased(0) || (typeof gamepadWasPressed !== 'undefined' && gamepadWasPressed(0)))) {
         if (typeof uiSound === 'function') uiSound();
@@ -6106,6 +6385,11 @@ function renderStartScreen() {
 
     // 6. Badges & Secondary Panels (CTA, Records Ledger, Streamer Hint, D-07, D-08)
     renderStartScreenBadges(cx, H, u, safeW);
+
+    // 7. Field Manual Modal Overlay (if active, D-11, D-12)
+    if (g_startHelpOpen) {
+        renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH);
+    }
 
     overlayContext.restore();
 }
