@@ -18,38 +18,199 @@ function apgTimerActive(name) {
 }
 
 /**
- * Phase 3 APG anti-softlock helper (D-02, D-03): permanently breaks the door at
- * tile (x, y), swapping it for a floor tile and clearing its collision.
+ * Break door object or door at (x, y) per D-43, D-45, D-52, D-53.
+ */
+function breakDoor(door) {
+	if (!door) return false;
+	return breakDoorAt(door.x, door.y, true);
+}
+
+/**
+ * Phase 3 / Phase 23 APG anti-softlock and ballistics helper (D-02, D-43, D-52, D-53):
+ * breaks the door at tile (x, y), swapping it for a floor tile and clearing its collision.
  * Used by bullets, `!repair` and enemies stuck against a door.
  * Returns true if a door was actually broken.
  */
 function breakDoorAt(x, y, playEffects = true) {
-	let idx = x + "_" + y;
-	let door = g_doors[idx];
+	let idx = Math.floor(x) + "_" + Math.floor(y);
+	let door = typeof g_doors !== "undefined" ? g_doors[idx] : null;
 	if (door) {
 		if (door.broken) return false;
 		door.hp = 0;
 		door.broken = true;
-	} else {
-		g_doors[idx] = { hp: 0, x: x, y: y, broken: true };
+	} else if (typeof g_doors !== "undefined") {
+		g_doors[idx] = { hp: 0, x: Math.floor(x), y: Math.floor(y), broken: true, maxHp: typeof DOOR_MAX_HP !== "undefined" ? DOOR_MAX_HP : 45 };
 	}
-	let pos = vec2(x, y);
+	let pos = vec2(Math.floor(x), Math.floor(y));
 	let floorTile = new TileLayerData(
 		tileNumbers_floorStone,
 		randInt(4),
 		false,
 		new Color(1, 1, 1, rand(0.2, 0.5))
 	);
-	if (tileLayer) {
+	if (typeof tileLayer !== "undefined" && tileLayer) {
 		tileLayer.setData(pos, floorTile, true);
 		tileLayer.redraw();
 	}
-	setTileCollisionData(pos, 0);
+	if (typeof setTileCollisionData === "function") {
+		setTileCollisionData(pos, 0);
+	}
 	if (playEffects) {
-		soundBoulderDestroy.play(pos, 3);
-		makeParticles(pos.add(vec2(0.5)), 0.3, colorWhite, 0.5);
+		if (typeof soundDoorBreak !== "undefined" && soundDoorBreak && soundDoorBreak.play) {
+			soundDoorBreak.play(pos);
+		} else if (typeof soundBoulderDestroy !== "undefined" && soundBoulderDestroy && soundBoulderDestroy.play) {
+			soundBoulderDestroy.play(pos, 3);
+		}
+		if (typeof makeParticles === "function") {
+			makeParticles(pos.add(vec2(0.5)), 0.35, new Color(180 / 255, 120 / 255, 60 / 255), 0.5); // 12 wood splinter particles
+		}
 	}
 	return true;
+}
+
+/**
+ * Reconstruct all barricade doors with full 45 HP at wave transitions per D-45, D-46.
+ */
+function reconstructDoors() {
+	if (typeof g_doors === "undefined" || !g_doors) return;
+	for (let key in g_doors) {
+		let door = g_doors[key];
+		if (!door) continue;
+		door.hp = door.maxHp || (typeof DOOR_MAX_HP !== "undefined" ? DOOR_MAX_HP : 45);
+		door.broken = false;
+		door.bashTimer = 0;
+		let pos = vec2(door.x, door.y);
+		if (typeof tileLayer !== "undefined" && tileLayer) {
+			let doorTile = new TileLayerData(tileNumbers_door, 0);
+			tileLayer.setData(pos, doorTile, true);
+		}
+		if (typeof setTileCollisionData === "function") {
+			setTileCollisionData(pos, 1);
+		}
+	}
+	if (typeof tileLayer !== "undefined" && tileLayer) {
+		tileLayer.redraw();
+	}
+}
+
+/**
+ * Dungeon cycling rotates sequentially through multi-room layouts (Maps 0, 1, 3, 4)
+ * with Map 2 (open Boss Arena) appearing every 5th wave per D-07.
+ */
+function getMapIndexForLevel(level) {
+	if (level < 5) {
+		return levelDefs[level % levelDefs.length].map;
+	}
+	let wave = level - 4; // 1-indexed nightmare wave: 1, 2, 3, 4, 5...
+	if (wave % 5 === 0) {
+		return 2; // Boss Arena every 5th wave (Wave 5, 10, 15...)
+	}
+	const multiRoomSequence = [0, 1, 3, 4];
+	let cycleIdx = (wave - 1) % 5;
+	return multiRoomSequence[cycleIdx];
+}
+
+function setupMapForLevel(level) {
+	let mapIdx = getMapIndexForLevel(level);
+	if (level < 5) {
+		g_levelDef = levelDefs[level % levelDefs.length];
+	} else {
+		g_levelDef = {
+			map: mapIdx,
+			enemiesToSpawn: Infinity,
+			enemiesMaxAlive: Math.min(40, 25 + (level - 5) * 3),
+			spawns: [{ chance: 0.4 }, { type: "v", chance: 0.25 }, { type: "g", chance: 0.25 }, { type: "b", chance: 0.1 }],
+		};
+	}
+	return mapIdx;
+}
+
+function spawnWeaponPedestal(x, y, weaponType) {
+	let pos = vec2(x, y);
+	let tilePos = vec2(Math.floor(x), Math.floor(y));
+	if (typeof tileLayer !== "undefined" && tileLayer) {
+		tileLayer.setData(tilePos, new TileLayerData(tileNumbers_floorStone, 0), true);
+	}
+	if (weaponType === tileNumbers_pistol) {
+		return new Pistol(pos);
+	} else if (weaponType === tileNumbers_shotgun) {
+		return new Shotgun(pos);
+	} else if (weaponType === tileNumbers_rifle) {
+		return new Rifle(pos);
+	} else if (weaponType === tileNumbers_smg) {
+		return new MachinePistol(pos);
+	}
+}
+
+/**
+ * Nightmare Wave 1 and milestone waves generate a dedicated 7x7 starting armory safe room at spawn per D-08.
+ * Spawns 4 core weapons at Cardinal points 2.8 tiles from spawn on carved stone floor pedestals per D-09.
+ */
+function setupArmoryRoom(spawnX, spawnY) {
+	let cx = Math.floor(spawnX);
+	let cy = Math.floor(spawnY);
+
+	// Clear 7x7 safe chamber: -3 to +3 in dx and dy
+	for (let dy = -3; dy <= 3; dy++) {
+		for (let dx = -3; dx <= 3; dx++) {
+			let tx = cx + dx;
+			let ty = cy + dy;
+			let pos = vec2(tx, ty);
+
+			if (Math.abs(dx) === 3 || Math.abs(dy) === 3) {
+				// Wall boundary
+				if (typeof tileLayer !== "undefined" && tileLayer) {
+					tileLayer.setData(pos, new TileLayerData(9, 0), true);
+				}
+				if (typeof setTileCollisionData === "function") {
+					setTileCollisionData(pos, 1);
+				}
+			} else {
+				// Floor
+				if (typeof tileLayer !== "undefined" && tileLayer) {
+					tileLayer.setData(pos, new TileLayerData(tileNumbers_floorStone, randInt(4)), true);
+				}
+				if (typeof setTileCollisionData === "function") {
+					setTileCollisionData(pos, 0);
+				}
+			}
+		}
+	}
+
+	// Single 1-tile door opening on the North boundary wall (dx = 0, dy = -3) per D-43
+	let doorX = cx;
+	let doorY = cy - 3;
+	let doorPos = vec2(doorX, doorY);
+	if (typeof tileLayer !== "undefined" && tileLayer) {
+		tileLayer.setData(doorPos, new TileLayerData(tileNumbers_door, 0), true);
+	}
+	if (typeof setTileCollisionData === "function") {
+		setTileCollisionData(doorPos, 1);
+	}
+	if (typeof g_doors !== "undefined") {
+		let maxHp = typeof DOOR_MAX_HP !== "undefined" ? DOOR_MAX_HP : 45;
+		g_doors[doorX + "_" + doorY] = {
+			x: doorX,
+			y: doorY,
+			hp: maxHp,
+			maxHp: maxHp,
+			reinforced: false,
+			broken: false,
+			bashTimer: 0
+		};
+	}
+
+	// Cardinal points (R = 2.8 tiles from spawn)
+	// North: Pistol, East: Shotgun, South: Rifle, West: Machine Pistol (SMG) per D-09
+	const dist = 2.8;
+	spawnWeaponPedestal(spawnX, spawnY - dist, tileNumbers_pistol);         // North
+	spawnWeaponPedestal(spawnX + dist, spawnY, tileNumbers_shotgun);        // East
+	spawnWeaponPedestal(spawnX, spawnY + dist, tileNumbers_rifle);          // South
+	spawnWeaponPedestal(spawnX - dist, spawnY, tileNumbers_smg);            // West
+
+	if (typeof tileLayer !== "undefined" && tileLayer) {
+		tileLayer.redraw();
+	}
 }
 
 /**
@@ -138,9 +299,10 @@ class MapManager {
 					}
 
 					if (t == tileNumbers_door) {
-						// Phase 3: full doorway registry so !repair knows every door (D-02)
+						// Phase 3 & 23: full doorway registry with 45 HP barricade doors (D-02, D-43)
 						let dy = h - 1 - y;
-						g_doors[x + "_" + dy] = { hp: 3, x: x, y: dy, broken: false };
+						let maxHp = typeof DOOR_MAX_HP !== "undefined" ? DOOR_MAX_HP : 45;
+						g_doors[x + "_" + dy] = { hp: maxHp, maxHp: maxHp, x: x, y: dy, broken: false, reinforced: false, bashTimer: 0 };
 					} else {
 						// pushers on all collision stuff except doors
 						pushers.push(new Pusher(offsetVec, 0.01, 0.5, 1.5, 0, PushTo.ALL));
@@ -176,6 +338,15 @@ class MapManager {
 					let tld = new TileLayerData(t, 0, t == 24 ? false : rand() < 0.5);
 					tileLayer.setData(vec2(x, h - 1 - y), tld);
 				}
+			}
+		}
+
+		// Check for Nightmare starting armory safe room generation per D-08
+		if (typeof g_level !== "undefined" && g_level >= 5) {
+			let nightmareWave = g_level - 4;
+			let isArmoryWave = (nightmareWave === 1 || (nightmareWave - 1) % 5 === 0 || nightmareWave % 5 === 0);
+			if (isArmoryWave && playerSpawn) {
+				setupArmoryRoom(playerSpawn.x, playerSpawn.y);
 			}
 		}
 

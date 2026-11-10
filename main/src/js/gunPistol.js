@@ -13,14 +13,19 @@ class Pistol extends Gun {
 
 		this.reloadTimePerBullet = 0.18;
 
+		this.name = 'Pistol';
+		this.bulletDamage = 1.0; // Standard pistol remains untouched at 1.0 damage per shot per D-11
+
 		this._soundFire = soundPistol;
 	}
 
 	fire() {
 		if (super.fire(colorBullet)) {
-			let bullet = new Bullet(this.pos.copy(), 0, colorBullet, 28);
+			let bullet = new Bullet(this.pos.copy(), 0, colorBullet, 28, this.bulletDamage);
 			bullet.velocity.x = Math.cos(-this.angle) * this._speed;
 			bullet.velocity.y = Math.sin(-this.angle) * this._speed;
+			bullet.bulletDamage = this.bulletDamage;
+			bullet.isPistol = true;
 		}
 		return true;
 	}

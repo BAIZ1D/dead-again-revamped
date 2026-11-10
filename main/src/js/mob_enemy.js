@@ -172,7 +172,7 @@ class Enemy extends Mob {
 	}
 
 	hit(velocity, pos, dam) {
-		if (this.hp <= 0) return;
+		if (this.hp <= 0.05) return;
 
 		this.hp -= dam;
 		this.groan(1, 2, rand(1, 1.5));
@@ -181,9 +181,10 @@ class Enemy extends Mob {
 
 		this.bloodEmitter = makeParticles(this.pos, rand(dam / 4, dam / 2));
 
-		for (let i = dam; i--; ) fx_splatter(pos);
+		let splatCount = Math.max(1, Math.round(dam));
+		for (let i = splatCount; i--; ) fx_splatter(pos);
 
-		if (this.hp <= 0) {
+		if (this.hp <= 0.05) {
 			this.groan(1, 3, rand(2, 2.5), 2 + rand(3));
 
 			let corpse = new Corpse(this.pos.copy(), this.size.copy(), this.tileIndex, this.tileSize);

@@ -15,7 +15,10 @@ class MachinePistol extends Gun {
 
 		this.autoFire = true;
 
-		this.fireDelay = 0.08; // 80ms cyclic rate in engine seconds
+		this.name = 'SMG';
+		this.fireRate = 90; // 90ms cyclic rate
+		this.fireDelay = 0.09; // 90ms cyclic rate in engine seconds (retuned from 80ms per D-11)
+		this.bulletDamage = 0.65; // Global SMG rebalance: 0.65 damage per bullet (cuts DPS to ~7.2 per D-11)
 		this.burstRecoveryTime = 0.16; // 160ms trigger release pause reset threshold
 		this.lastFireTime = -100;
 		this.burstCount = 0;
@@ -96,9 +99,11 @@ class MachinePistol extends Gun {
 			const velocityJitter = 1 + (rand() - 0.5) * 0.16;
 			const bulletSpeed = this._speed * velocityJitter;
 
-			let bullet = new Bullet(this.pos.copy(), 0, colorBullet, 28);
+			let bullet = new Bullet(this.pos.copy(), 0, colorBullet, 28, this.bulletDamage);
 			bullet.velocity.x = Math.cos(bulletAngle) * bulletSpeed;
 			bullet.velocity.y = Math.sin(bulletAngle) * bulletSpeed;
+			bullet.bulletDamage = this.bulletDamage;
+			bullet.isSmg = true;
 		}
 		return true;
 	}

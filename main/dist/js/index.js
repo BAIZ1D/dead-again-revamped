@@ -140,7 +140,11 @@ function enterLobbyState() {
 
 	engineObjectsDestroy();
 
-	g_levelDef = levelDefs[g_level % levelDefs.length];
+	if (typeof setupMapForLevel === "function") {
+		setupMapForLevel(g_level);
+	} else {
+		g_levelDef = levelDefs[g_level % levelDefs.length];
+	}
 	mapMan = new MapManager();
 
 	for (let i = 0; i < g_enemies.length; i++) {
@@ -199,7 +203,11 @@ function startNextLevel() {
 	/////////////////////
 	// Setup new level
 
-	g_levelDef = levelDefs[g_level % levelDefs.length];
+	if (typeof setupMapForLevel === "function") {
+		setupMapForLevel(g_level);
+	} else {
+		g_levelDef = levelDefs[g_level % levelDefs.length];
+	}
 
 	mapMan = new MapManager();
 
@@ -962,6 +970,10 @@ const tileNumbers_boxShells = 22;
 const tileNumbers_boxRifleAmmo = 23;
 const tileNumbers_floorStone = 12;
 const tileNumbers_door = 11;
+
+// Destructible Barricade Doors & Weapon Drop Cooldown (MODE-01, MODE-02, D-09, D-43)
+const DOOR_MAX_HP = 45;
+const WEAPON_DROP_COOLDOWN = 30; // 30 frames = 0.5s at 60fps
 
 // Reserve Ammo Caps (BAL-10, BAL-21, D-09)
 const MAX_AMMO_BULLETS = 36;
@@ -3887,7 +3899,7 @@ class Enemy extends Mob {
 	}
 
 	hit(velocity, pos, dam) {
-		if (this.hp <= 0) return;
+		if (this.hp <= 0.05) return;
 
 		this.hp -= dam;
 		this.groan(1, 2, rand(1, 1.5));
@@ -3896,9 +3908,10 @@ class Enemy extends Mob {
 
 		this.bloodEmitter = makeParticles(this.pos, rand(dam / 4, dam / 2));
 
-		for (let i = dam; i--; ) fx_splatter(pos);
+		let splatCount = Math.max(1, Math.round(dam));
+		for (let i = splatCount; i--; ) fx_splatter(pos);
 
-		if (this.hp <= 0) {
+		if (this.hp <= 0.05) {
 			this.groan(1, 3, rand(2, 2.5), 2 + rand(3));
 
 			let corpse = new Corpse(this.pos.copy(), this.size.copy(), this.tileIndex, this.tileSize);
@@ -4046,6 +4059,9 @@ class Gun extends EngineObject {
 		// Phase 3 APG: !jam state (D-10)
 		this.isJammed = false;
 		this._baseReloadTimePerBullet = 0;
+
+		// Phase 23: Weapon drop pickup cooldown to prevent swap oscillating/ammo loss (D-09)
+		this.dropCooldown = 0;
 	}
 
 	update() {
@@ -4132,8 +4148,9 @@ class Gun extends EngineObject {
 				this.reload();
 			}
 		} else if (!this.owner) {
-			// look for owner
-			if (typeof g_player !== "undefined" && g_player) {
+			if (this.dropCooldown > 0) {
+				this.dropCooldown--;
+			} else if (typeof g_player !== "undefined" && g_player) {
 				let playerTouch = isOverlapping(this.pos, this._hitbox, g_player.pos, g_player._hitbox);
 
 				if (g_player.hp > 0 && playerTouch && !this.playerTouchLastFrame) {
@@ -4188,6 +4205,7 @@ class Gun extends EngineObject {
 			player.gun.angle = 0;
 			player.gun.owner = null;
 			player.gun.pos = this.pos.copy();
+			player.gun.dropCooldown = typeof WEAPON_DROP_COOLDOWN !== "undefined" ? WEAPON_DROP_COOLDOWN : 30;
 			soundPickup.play(this.pos);
 		}
 		this.owner = player;
@@ -4472,6 +4490,9 @@ class Bullet extends EngineObject {
 		this._hitbox = vec2(0.25);
 
 		this.penetration = penetration || 1;
+		this.penetrationCount = this.penetration;
+		this.bulletDamage = this.bulletDamage || this.penetration || 1;
+		this.startPos = pos.copy();
 		this.timeAlive = 0;
 		this.setCollision(true, true, true);
 
@@ -4504,15 +4525,21 @@ class Bullet extends EngineObject {
 
 	collideWithTile(tileData, pos) {
 		if (tileData == tileNumbers_door) {
-			let idx = pos.x + "_" + pos.y;
-			if (g_doors[idx]) {
-				g_doors[idx].hp--;
-				this.hitWall(true);
-				soundBoulderDestroy.play(pos, 1.5);
-				makeParticles(pos.add(vec2(0.5)), 0.1, colorWhite, 0.25);
-				if (g_doors[idx].hp <= 0) {
-					// shared anti-softlock helper (D-02, D-03)
-					breakDoorAt(pos.x, pos.y, true);
+			let idx = Math.floor(pos.x) + "_" + Math.floor(pos.y);
+			let door = typeof g_doors !== "undefined" ? g_doors[idx] : null;
+			if (door && !door.broken) {
+				let destroyBullet = handleBulletDoorCollision(this, door);
+				if (destroyBullet) {
+					this.hitWall(true);
+					this.destroy();
+					this.hitSound.play();
+					return false;
+				} else {
+					// Bullet penetrated door (e.g. Rifle per D-52)!
+					if (typeof fx_addSpark === "function") {
+						fx_addSpark(this.pos.copy());
+					}
+					return false; // continue flying through door
 				}
 			}
 		}
@@ -4524,10 +4551,10 @@ class Bullet extends EngineObject {
 
 	collideWithObject(o) {
 		//console.log("bullet hit : ", o);
-		if (this.penetration <= 0) return false;
+		if (this.penetration <= 0.05) return false;
 
 		if (o instanceof Enemy) {
-			if (o.hp <= 0) return false;
+			if (o.hp <= 0.05) return false;
 
 			var damage = min(o.hp, this.penetration);
 
@@ -4535,14 +4562,97 @@ class Bullet extends EngineObject {
 			this.hitSound.play(this.pos);
 
 			this.penetration -= damage;
+			this.penetrationCount = this.penetration;
 
-			if (this.penetration <= 0) {
+			if (this.penetration <= 0.05) {
 				this.destroy();
-				return;
+				return false;
 			}
 		}
 
 		return false; // no auto resolve of collision
+	}
+}
+
+function spawnSplinterParticles(x, y, count = 4) {
+	let p = vec2(Math.floor(x) + 0.5, Math.floor(y) + 0.5);
+	if (typeof makeParticles === "function") {
+		makeParticles(p, count * 0.05, new Color(180 / 255, 120 / 255, 60 / 255), 0.25);
+	}
+}
+
+function spawnShotgunShrapnel(x, y, dir) {
+	let p = vec2(Math.floor(x) + 0.5, Math.floor(y) + 0.5);
+	if (typeof makeParticles === "function") {
+		makeParticles(p, 0.4, new Color(180 / 255, 120 / 255, 60 / 255), 0.5);
+	}
+	if (typeof g_enemies !== "undefined" && g_enemies) {
+		for (let i = 0; i < g_enemies.length; i++) {
+			let e = g_enemies[i];
+			if (e && e.pos && e.pos.distance(p) < 2.0) {
+				let toEnemy = e.pos.subtract(p);
+				if (toEnemy.dot(dir) > -0.2) {
+					e.hit(dir.scale(0.3), e.pos.copy(), 1.0);
+				}
+			}
+		}
+	}
+}
+
+function handleBulletDoorCollision(bullet, door) {
+	if (!door || door.broken) return false;
+
+	let tilePos = vec2(door.x, door.y);
+	let dam = bullet.bulletDamage || bullet.damage || bullet.penetration || 1;
+
+	if (bullet.isRifle) {
+		// Rifle penetrates door, costing 1 penetration point while damaging the door (D-52)
+		door.hp -= dam;
+		bullet.penetration -= 1;
+		bullet.penetrationCount = (bullet.penetrationCount || bullet.penetration) - 1;
+		spawnSplinterParticles(door.x, door.y, 4);
+		if (typeof soundDoorBash !== "undefined" && soundDoorBash && soundDoorBash.play) {
+			soundDoorBash.play(tilePos);
+		} else if (typeof soundBoulderDestroy !== "undefined" && soundBoulderDestroy && soundBoulderDestroy.play) {
+			soundBoulderDestroy.play(tilePos, 1.2);
+		}
+		if (door.hp <= 0.05) {
+			breakDoorAt(door.x, door.y, true);
+		}
+		return bullet.penetration <= 0.05; // destroy only if penetration exhausted
+	} else if (bullet.isShotgun && (bullet.startPos ? bullet.pos.distance(bullet.startPos) : 0) < 2.0) {
+		// Point-blank shotgun blast obliterates barricade doors into splinters with forward shrapnel (D-53)
+		door.hp = 0;
+		breakDoorAt(door.x, door.y, true);
+		let dir = vec2(1, 0);
+		if (bullet.velocity) {
+			if (typeof bullet.velocity.length === "function" && bullet.velocity.length() > 0 && typeof bullet.velocity.normalize === "function") {
+				dir = bullet.velocity.normalize();
+			} else if (bullet.velocity.x || bullet.velocity.y) {
+				let len = Math.hypot(bullet.velocity.x, bullet.velocity.y) || 1;
+				dir = vec2(bullet.velocity.x / len, bullet.velocity.y / len);
+			}
+		}
+		spawnShotgunShrapnel(door.x, door.y, dir);
+		if (typeof soundDoorBreak !== "undefined" && soundDoorBreak && soundDoorBreak.play) {
+			soundDoorBreak.play(tilePos);
+		} else if (typeof soundBoulderDestroy !== "undefined" && soundBoulderDestroy && soundBoulderDestroy.play) {
+			soundBoulderDestroy.play(tilePos, 3);
+		}
+		return true; // destroy pellet
+	} else {
+		// Pistol, SMG, or distant Shotgun impact and stop on barricade door surface (D-52)
+		door.hp -= dam;
+		spawnSplinterParticles(door.x, door.y, 2);
+		if (typeof soundDoorBash !== "undefined" && soundDoorBash && soundDoorBash.play) {
+			soundDoorBash.play(tilePos);
+		} else if (typeof soundBoulderDestroy !== "undefined" && soundBoulderDestroy && soundBoulderDestroy.play) {
+			soundBoulderDestroy.play(tilePos, 1.0);
+		}
+		if (door.hp <= 0.05) {
+			breakDoorAt(door.x, door.y, true);
+		}
+		return true; // destroy bullet
 	}
 }
 
@@ -4680,7 +4790,10 @@ class MachinePistol extends Gun {
 
 		this.autoFire = true;
 
-		this.fireDelay = 0.08; // 80ms cyclic rate in engine seconds
+		this.name = 'SMG';
+		this.fireRate = 90; // 90ms cyclic rate
+		this.fireDelay = 0.09; // 90ms cyclic rate in engine seconds (retuned from 80ms per D-11)
+		this.bulletDamage = 0.65; // Global SMG rebalance: 0.65 damage per bullet (cuts DPS to ~7.2 per D-11)
 		this.burstRecoveryTime = 0.16; // 160ms trigger release pause reset threshold
 		this.lastFireTime = -100;
 		this.burstCount = 0;
@@ -4761,9 +4874,11 @@ class MachinePistol extends Gun {
 			const velocityJitter = 1 + (rand() - 0.5) * 0.16;
 			const bulletSpeed = this._speed * velocityJitter;
 
-			let bullet = new Bullet(this.pos.copy(), 0, colorBullet, 28);
+			let bullet = new Bullet(this.pos.copy(), 0, colorBullet, 28, this.bulletDamage);
 			bullet.velocity.x = Math.cos(bulletAngle) * bulletSpeed;
 			bullet.velocity.y = Math.sin(bulletAngle) * bulletSpeed;
+			bullet.bulletDamage = this.bulletDamage;
+			bullet.isSmg = true;
 		}
 		return true;
 	}
@@ -4784,14 +4899,19 @@ class Pistol extends Gun {
 
 		this.reloadTimePerBullet = 0.18;
 
+		this.name = 'Pistol';
+		this.bulletDamage = 1.0; // Standard pistol remains untouched at 1.0 damage per shot per D-11
+
 		this._soundFire = soundPistol;
 	}
 
 	fire() {
 		if (super.fire(colorBullet)) {
-			let bullet = new Bullet(this.pos.copy(), 0, colorBullet, 28);
+			let bullet = new Bullet(this.pos.copy(), 0, colorBullet, 28, this.bulletDamage);
 			bullet.velocity.x = Math.cos(-this.angle) * this._speed;
 			bullet.velocity.y = Math.sin(-this.angle) * this._speed;
+			bullet.bulletDamage = this.bulletDamage;
+			bullet.isPistol = true;
 		}
 		return true;
 	}
@@ -4812,6 +4932,9 @@ class Rifle extends Gun {
 		this.ammo = this._maxAmmo;
 		this.reloadTimePerBullet = 2;
 
+		this.name = 'Rifle';
+		this.bulletDamage = 12;
+
 		this._soundFire = soundRifle;
 	}
 
@@ -4822,6 +4945,10 @@ class Rifle extends Gun {
 			let bullet = new Bullet(this.pos.copy(), 0, colorRifleRound, 40, penetration);
 			bullet.velocity.x = Math.cos(-this.angle) * this._speed;
 			bullet.velocity.y = Math.sin(-this.angle) * this._speed;
+			bullet.isRifle = true;
+			bullet.bulletDamage = this.bulletDamage;
+			bullet.penetration = penetration;
+			bullet.penetrationCount = penetration;
 		}
 		return true;
 	}
@@ -4839,6 +4966,9 @@ class Shotgun extends Gun {
 		this.ammo = this._maxAmmo;
 		this.reloadTimePerBullet = 0.6;
 
+		this.name = 'Shotgun';
+		this.bulletDamage = 1.0;
+
 		this._soundFire = soundShotgun;
 	}
 
@@ -4854,6 +4984,9 @@ class Shotgun extends Gun {
 				let bullet = new Bullet(this.pos.copy(), 0, bulletColor, bulletLife);
 				bullet.velocity.x = Math.cos(angle) * this._speed;
 				bullet.velocity.y = Math.sin(angle) * this._speed;
+				bullet.isShotgun = true;
+				bullet.bulletDamage = this.bulletDamage;
+				bullet.startPos = this.pos.copy();
 				angle += spread / bullets;
 			}
 		}
@@ -4881,38 +5014,199 @@ function apgTimerActive(name) {
 }
 
 /**
- * Phase 3 APG anti-softlock helper (D-02, D-03): permanently breaks the door at
- * tile (x, y), swapping it for a floor tile and clearing its collision.
+ * Break door object or door at (x, y) per D-43, D-45, D-52, D-53.
+ */
+function breakDoor(door) {
+	if (!door) return false;
+	return breakDoorAt(door.x, door.y, true);
+}
+
+/**
+ * Phase 3 / Phase 23 APG anti-softlock and ballistics helper (D-02, D-43, D-52, D-53):
+ * breaks the door at tile (x, y), swapping it for a floor tile and clearing its collision.
  * Used by bullets, `!repair` and enemies stuck against a door.
  * Returns true if a door was actually broken.
  */
 function breakDoorAt(x, y, playEffects = true) {
-	let idx = x + "_" + y;
-	let door = g_doors[idx];
+	let idx = Math.floor(x) + "_" + Math.floor(y);
+	let door = typeof g_doors !== "undefined" ? g_doors[idx] : null;
 	if (door) {
 		if (door.broken) return false;
 		door.hp = 0;
 		door.broken = true;
-	} else {
-		g_doors[idx] = { hp: 0, x: x, y: y, broken: true };
+	} else if (typeof g_doors !== "undefined") {
+		g_doors[idx] = { hp: 0, x: Math.floor(x), y: Math.floor(y), broken: true, maxHp: typeof DOOR_MAX_HP !== "undefined" ? DOOR_MAX_HP : 45 };
 	}
-	let pos = vec2(x, y);
+	let pos = vec2(Math.floor(x), Math.floor(y));
 	let floorTile = new TileLayerData(
 		tileNumbers_floorStone,
 		randInt(4),
 		false,
 		new Color(1, 1, 1, rand(0.2, 0.5))
 	);
-	if (tileLayer) {
+	if (typeof tileLayer !== "undefined" && tileLayer) {
 		tileLayer.setData(pos, floorTile, true);
 		tileLayer.redraw();
 	}
-	setTileCollisionData(pos, 0);
+	if (typeof setTileCollisionData === "function") {
+		setTileCollisionData(pos, 0);
+	}
 	if (playEffects) {
-		soundBoulderDestroy.play(pos, 3);
-		makeParticles(pos.add(vec2(0.5)), 0.3, colorWhite, 0.5);
+		if (typeof soundDoorBreak !== "undefined" && soundDoorBreak && soundDoorBreak.play) {
+			soundDoorBreak.play(pos);
+		} else if (typeof soundBoulderDestroy !== "undefined" && soundBoulderDestroy && soundBoulderDestroy.play) {
+			soundBoulderDestroy.play(pos, 3);
+		}
+		if (typeof makeParticles === "function") {
+			makeParticles(pos.add(vec2(0.5)), 0.35, new Color(180 / 255, 120 / 255, 60 / 255), 0.5); // 12 wood splinter particles
+		}
 	}
 	return true;
+}
+
+/**
+ * Reconstruct all barricade doors with full 45 HP at wave transitions per D-45, D-46.
+ */
+function reconstructDoors() {
+	if (typeof g_doors === "undefined" || !g_doors) return;
+	for (let key in g_doors) {
+		let door = g_doors[key];
+		if (!door) continue;
+		door.hp = door.maxHp || (typeof DOOR_MAX_HP !== "undefined" ? DOOR_MAX_HP : 45);
+		door.broken = false;
+		door.bashTimer = 0;
+		let pos = vec2(door.x, door.y);
+		if (typeof tileLayer !== "undefined" && tileLayer) {
+			let doorTile = new TileLayerData(tileNumbers_door, 0);
+			tileLayer.setData(pos, doorTile, true);
+		}
+		if (typeof setTileCollisionData === "function") {
+			setTileCollisionData(pos, 1);
+		}
+	}
+	if (typeof tileLayer !== "undefined" && tileLayer) {
+		tileLayer.redraw();
+	}
+}
+
+/**
+ * Dungeon cycling rotates sequentially through multi-room layouts (Maps 0, 1, 3, 4)
+ * with Map 2 (open Boss Arena) appearing every 5th wave per D-07.
+ */
+function getMapIndexForLevel(level) {
+	if (level < 5) {
+		return levelDefs[level % levelDefs.length].map;
+	}
+	let wave = level - 4; // 1-indexed nightmare wave: 1, 2, 3, 4, 5...
+	if (wave % 5 === 0) {
+		return 2; // Boss Arena every 5th wave (Wave 5, 10, 15...)
+	}
+	const multiRoomSequence = [0, 1, 3, 4];
+	let cycleIdx = (wave - 1) % 5;
+	return multiRoomSequence[cycleIdx];
+}
+
+function setupMapForLevel(level) {
+	let mapIdx = getMapIndexForLevel(level);
+	if (level < 5) {
+		g_levelDef = levelDefs[level % levelDefs.length];
+	} else {
+		g_levelDef = {
+			map: mapIdx,
+			enemiesToSpawn: Infinity,
+			enemiesMaxAlive: Math.min(40, 25 + (level - 5) * 3),
+			spawns: [{ chance: 0.4 }, { type: "v", chance: 0.25 }, { type: "g", chance: 0.25 }, { type: "b", chance: 0.1 }],
+		};
+	}
+	return mapIdx;
+}
+
+function spawnWeaponPedestal(x, y, weaponType) {
+	let pos = vec2(x, y);
+	let tilePos = vec2(Math.floor(x), Math.floor(y));
+	if (typeof tileLayer !== "undefined" && tileLayer) {
+		tileLayer.setData(tilePos, new TileLayerData(tileNumbers_floorStone, 0), true);
+	}
+	if (weaponType === tileNumbers_pistol) {
+		return new Pistol(pos);
+	} else if (weaponType === tileNumbers_shotgun) {
+		return new Shotgun(pos);
+	} else if (weaponType === tileNumbers_rifle) {
+		return new Rifle(pos);
+	} else if (weaponType === tileNumbers_smg) {
+		return new MachinePistol(pos);
+	}
+}
+
+/**
+ * Nightmare Wave 1 and milestone waves generate a dedicated 7x7 starting armory safe room at spawn per D-08.
+ * Spawns 4 core weapons at Cardinal points 2.8 tiles from spawn on carved stone floor pedestals per D-09.
+ */
+function setupArmoryRoom(spawnX, spawnY) {
+	let cx = Math.floor(spawnX);
+	let cy = Math.floor(spawnY);
+
+	// Clear 7x7 safe chamber: -3 to +3 in dx and dy
+	for (let dy = -3; dy <= 3; dy++) {
+		for (let dx = -3; dx <= 3; dx++) {
+			let tx = cx + dx;
+			let ty = cy + dy;
+			let pos = vec2(tx, ty);
+
+			if (Math.abs(dx) === 3 || Math.abs(dy) === 3) {
+				// Wall boundary
+				if (typeof tileLayer !== "undefined" && tileLayer) {
+					tileLayer.setData(pos, new TileLayerData(9, 0), true);
+				}
+				if (typeof setTileCollisionData === "function") {
+					setTileCollisionData(pos, 1);
+				}
+			} else {
+				// Floor
+				if (typeof tileLayer !== "undefined" && tileLayer) {
+					tileLayer.setData(pos, new TileLayerData(tileNumbers_floorStone, randInt(4)), true);
+				}
+				if (typeof setTileCollisionData === "function") {
+					setTileCollisionData(pos, 0);
+				}
+			}
+		}
+	}
+
+	// Single 1-tile door opening on the North boundary wall (dx = 0, dy = -3) per D-43
+	let doorX = cx;
+	let doorY = cy - 3;
+	let doorPos = vec2(doorX, doorY);
+	if (typeof tileLayer !== "undefined" && tileLayer) {
+		tileLayer.setData(doorPos, new TileLayerData(tileNumbers_door, 0), true);
+	}
+	if (typeof setTileCollisionData === "function") {
+		setTileCollisionData(doorPos, 1);
+	}
+	if (typeof g_doors !== "undefined") {
+		let maxHp = typeof DOOR_MAX_HP !== "undefined" ? DOOR_MAX_HP : 45;
+		g_doors[doorX + "_" + doorY] = {
+			x: doorX,
+			y: doorY,
+			hp: maxHp,
+			maxHp: maxHp,
+			reinforced: false,
+			broken: false,
+			bashTimer: 0
+		};
+	}
+
+	// Cardinal points (R = 2.8 tiles from spawn)
+	// North: Pistol, East: Shotgun, South: Rifle, West: Machine Pistol (SMG) per D-09
+	const dist = 2.8;
+	spawnWeaponPedestal(spawnX, spawnY - dist, tileNumbers_pistol);         // North
+	spawnWeaponPedestal(spawnX + dist, spawnY, tileNumbers_shotgun);        // East
+	spawnWeaponPedestal(spawnX, spawnY + dist, tileNumbers_rifle);          // South
+	spawnWeaponPedestal(spawnX - dist, spawnY, tileNumbers_smg);            // West
+
+	if (typeof tileLayer !== "undefined" && tileLayer) {
+		tileLayer.redraw();
+	}
 }
 
 /**
@@ -5001,9 +5295,10 @@ class MapManager {
 					}
 
 					if (t == tileNumbers_door) {
-						// Phase 3: full doorway registry so !repair knows every door (D-02)
+						// Phase 3 & 23: full doorway registry with 45 HP barricade doors (D-02, D-43)
 						let dy = h - 1 - y;
-						g_doors[x + "_" + dy] = { hp: 3, x: x, y: dy, broken: false };
+						let maxHp = typeof DOOR_MAX_HP !== "undefined" ? DOOR_MAX_HP : 45;
+						g_doors[x + "_" + dy] = { hp: maxHp, maxHp: maxHp, x: x, y: dy, broken: false, reinforced: false, bashTimer: 0 };
 					} else {
 						// pushers on all collision stuff except doors
 						pushers.push(new Pusher(offsetVec, 0.01, 0.5, 1.5, 0, PushTo.ALL));
@@ -5039,6 +5334,15 @@ class MapManager {
 					let tld = new TileLayerData(t, 0, t == 24 ? false : rand() < 0.5);
 					tileLayer.setData(vec2(x, h - 1 - y), tld);
 				}
+			}
+		}
+
+		// Check for Nightmare starting armory safe room generation per D-08
+		if (typeof g_level !== "undefined" && g_level >= 5) {
+			let nightmareWave = g_level - 4;
+			let isArmoryWave = (nightmareWave === 1 || (nightmareWave - 1) % 5 === 0 || nightmareWave % 5 === 0);
+			if (isArmoryWave && playerSpawn) {
+				setupArmoryRoom(playerSpawn.x, playerSpawn.y);
 			}
 		}
 

@@ -49,6 +49,10 @@ const tileNumbers_boxRifleAmmo = 23;
 const tileNumbers_floorStone = 12;
 const tileNumbers_door = 11;
 
+// Destructible Barricade Doors & Weapon Drop Cooldown (MODE-01, MODE-02, D-09, D-43)
+const DOOR_MAX_HP = 45;
+const WEAPON_DROP_COOLDOWN = 30; // 30 frames = 0.5s at 60fps
+
 // Reserve Ammo Caps (BAL-10, BAL-21, D-09)
 const MAX_AMMO_BULLETS = 36;
 const MAX_AMMO_SHELLS = 8; // Lowered from 12 to 8 (D-09)

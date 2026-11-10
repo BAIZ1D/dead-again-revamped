@@ -13,6 +13,9 @@ class Rifle extends Gun {
 		this.ammo = this._maxAmmo;
 		this.reloadTimePerBullet = 2;
 
+		this.name = 'Rifle';
+		this.bulletDamage = 12;
+
 		this._soundFire = soundRifle;
 	}
 
@@ -23,6 +26,10 @@ class Rifle extends Gun {
 			let bullet = new Bullet(this.pos.copy(), 0, colorRifleRound, 40, penetration);
 			bullet.velocity.x = Math.cos(-this.angle) * this._speed;
 			bullet.velocity.y = Math.sin(-this.angle) * this._speed;
+			bullet.isRifle = true;
+			bullet.bulletDamage = this.bulletDamage;
+			bullet.penetration = penetration;
+			bullet.penetrationCount = penetration;
 		}
 		return true;
 	}

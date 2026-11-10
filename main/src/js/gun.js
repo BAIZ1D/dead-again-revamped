@@ -30,6 +30,9 @@ class Gun extends EngineObject {
 		// Phase 3 APG: !jam state (D-10)
 		this.isJammed = false;
 		this._baseReloadTimePerBullet = 0;
+
+		// Phase 23: Weapon drop pickup cooldown to prevent swap oscillating/ammo loss (D-09)
+		this.dropCooldown = 0;
 	}
 
 	update() {
@@ -116,8 +119,9 @@ class Gun extends EngineObject {
 				this.reload();
 			}
 		} else if (!this.owner) {
-			// look for owner
-			if (typeof g_player !== "undefined" && g_player) {
+			if (this.dropCooldown > 0) {
+				this.dropCooldown--;
+			} else if (typeof g_player !== "undefined" && g_player) {
 				let playerTouch = isOverlapping(this.pos, this._hitbox, g_player.pos, g_player._hitbox);
 
 				if (g_player.hp > 0 && playerTouch && !this.playerTouchLastFrame) {
@@ -172,6 +176,7 @@ class Gun extends EngineObject {
 			player.gun.angle = 0;
 			player.gun.owner = null;
 			player.gun.pos = this.pos.copy();
+			player.gun.dropCooldown = typeof WEAPON_DROP_COOLDOWN !== "undefined" ? WEAPON_DROP_COOLDOWN : 30;
 			soundPickup.play(this.pos);
 		}
 		this.owner = player;

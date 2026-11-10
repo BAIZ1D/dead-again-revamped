@@ -140,7 +140,11 @@ function enterLobbyState() {
 
 	engineObjectsDestroy();
 
-	g_levelDef = levelDefs[g_level % levelDefs.length];
+	if (typeof setupMapForLevel === "function") {
+		setupMapForLevel(g_level);
+	} else {
+		g_levelDef = levelDefs[g_level % levelDefs.length];
+	}
 	mapMan = new MapManager();
 
 	for (let i = 0; i < g_enemies.length; i++) {
@@ -199,7 +203,11 @@ function startNextLevel() {
 	/////////////////////
 	// Setup new level
 
-	g_levelDef = levelDefs[g_level % levelDefs.length];
+	if (typeof setupMapForLevel === "function") {
+		setupMapForLevel(g_level);
+	} else {
+		g_levelDef = levelDefs[g_level % levelDefs.length];
+	}
 
 	mapMan = new MapManager();
 
