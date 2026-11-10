@@ -28,8 +28,8 @@ Requirements for Milestone v1.6 (Release v1.3.0). Each maps to roadmap phases.
 
 ### In-Game Stream Command Overlay (HUD)
 
-- [ ] **HUD-05**: Streamer and stream audience can view a dedicated Good vs Bad Twitch chat commands cheat-sheet card docked in the bottom-right margin displaying all 10 commands with concise descriptions, deconflicted from the bottom-center Karma meter and middle-right kill counter.
-- [ ] **HUD-06**: Streamer can toggle the bottom-right chat commands cheat-sheet overlay on or off via hotkey (`[C]`), showing a compact collapsed badge when hidden.
+- [x] **HUD-05**: Streamer and stream audience can view a dedicated Good vs Bad Twitch chat commands cheat-sheet card docked in the bottom-right margin displaying all 10 commands with concise descriptions, deconflicted from the bottom-center Karma meter and middle-right kill counter.
+- [x] **HUD-06**: Streamer can toggle the bottom-right chat commands cheat-sheet overlay on or off via hotkey (`[C]`), showing a compact collapsed badge when hidden.
 
 ### Endless Multi-Room Nightmare Mode (MODE)
 
@@ -84,8 +84,8 @@ Which phases cover which requirements. Filled by the roadmapper agent.
 | VIS-02  | Phase 21 | Complete |
 | VIS-03  | Phase 21 | Complete |
 | VIS-04  | Phase 21 | Complete |
-| HUD-05  | Phase 22 | Pending |
-| HUD-06  | Phase 22 | Pending |
+| HUD-05  | Phase 22 | Complete |
+| HUD-06  | Phase 22 | Complete |
 | MODE-01 | Phase 23 | Pending |
 | MODE-02 | Phase 23 | Pending |
 | MODE-03 | Phase 23 | Pending |
