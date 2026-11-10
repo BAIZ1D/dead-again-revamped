@@ -2,6 +2,29 @@
 
 var mapMan;
 
+function safeGetPref(key, fallback) {
+	try {
+		if (typeof localStorage !== 'undefined') {
+			const val = localStorage.getItem(key);
+			return val !== null ? val : fallback;
+		}
+	} catch (e) {}
+	return fallback;
+}
+
+function safeSetPref(key, value) {
+	try {
+		if (typeof localStorage !== 'undefined') {
+			localStorage.setItem(key, String(value));
+		}
+	} catch (e) {}
+}
+
+var g_cheatsheetVisible = safeGetPref('da_cheatsheet_visible', '1') === '1'; // D-06
+var g_cheatsheetDock = safeGetPref('da_cheatsheet_dock', 'right'); // 'right' or 'left', D-10
+var g_cheatsheetSlideProgress = g_cheatsheetVisible ? 1.0 : 0.0; // D-08
+var g_lastInputGamepad = false; // D-22
+
 function init() {
 	if (!document.body) {
 		// html document is not ready yet (safari mobile)
@@ -48,6 +71,21 @@ function startNewGame() {
 	g_savedEquipment = null;
 	g_isPaused = false;
 	if (typeof g_apgManager !== "undefined" && g_apgManager) g_apgManager.resetForNewGame();
+}
+
+function abandonRunToMainMenu() {
+	g_isPaused = false;
+	if (typeof g_startHelpOpen !== 'undefined') g_startHelpOpen = false;
+	clearPushers();
+	g_enemies = [];
+	g_corpses = [];
+	g_splatter = [];
+	g_holes = [];
+	g_moss = [];
+	uiFadeOutAndCall(() => {
+		startNewGame();
+		changeState(STATE_CLICK_TO_START);
+	});
 }
 
 var g_lobbyLockBannerTimer = 0;
@@ -247,7 +285,42 @@ function spawnEnemy() {
 function gameUpdate() {
 	uiFading();
 
+	if (typeof keyWasPressed !== 'undefined' && (keyWasPressed(67) || keyWasPressed(27) || keyWasPressed(80) || keyWasPressed(32))) {
+		g_lastInputGamepad = false;
+	}
+	if (typeof gamepadWasPressed !== 'undefined' && (gamepadWasPressed(8) || gamepadWasPressed(0) || gamepadWasPressed(1) || gamepadWasPressed(2) || gamepadWasPressed(3))) {
+		g_lastInputGamepad = true;
+	}
+
 	if (g_state == STATE_PLAYING) {
+		// Cheat-sheet hotkeys: [C] toggle, Shift+C dock flip, Gamepad Select (8) toggle (D-07, D-10, D-19)
+		if (typeof gamepadWasPressed !== 'undefined' && gamepadWasPressed(8)) {
+			g_cheatsheetVisible = !g_cheatsheetVisible;
+			safeSetPref('da_cheatsheet_visible', g_cheatsheetVisible ? '1' : '0');
+			uiSound(1);
+		}
+		if (keyWasPressed(67)) {
+			if (keyIsDown(16)) {
+				// Shift+C: Flip docking between Right and Left (D-10)
+				g_cheatsheetDock = g_cheatsheetDock === 'right' ? 'left' : 'right';
+				safeSetPref('da_cheatsheet_dock', g_cheatsheetDock);
+				uiSound(1);
+			} else {
+				// [C]: Toggle visibility (D-07)
+				g_cheatsheetVisible = !g_cheatsheetVisible;
+				safeSetPref('da_cheatsheet_visible', g_cheatsheetVisible ? '1' : '0');
+				uiSound(1);
+			}
+		}
+
+		const targetProgress = g_cheatsheetVisible ? 1.0 : 0.0;
+		const slideStep = 1 / 7;
+		if (g_cheatsheetSlideProgress < targetProgress) {
+			g_cheatsheetSlideProgress = Math.min(targetProgress, g_cheatsheetSlideProgress + slideStep);
+		} else if (g_cheatsheetSlideProgress > targetProgress) {
+			g_cheatsheetSlideProgress = Math.max(targetProgress, g_cheatsheetSlideProgress - slideStep);
+		}
+
 		// ESC (27) or P (80) toggles in-game pause or closes Field Manual if open (CLIP-06, D-08)
 		if (keyWasPressed(27) || keyWasPressed(80)) {
 			if (typeof g_startHelpOpen !== "undefined" && g_startHelpOpen) {
