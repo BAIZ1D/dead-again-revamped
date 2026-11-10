@@ -158,6 +158,11 @@ Milestone v1.6 elevates *Dead Again - Revamped (Twitch Edition)* into a producti
 **Depends on:** Phase 23  
 **Requirements:** `PKG-09`, `PKG-10`  
 **Target Files:** `package.json`, `package-lock.json`, `relay-server/package.json`, `desktop/updater.js`, `desktop/menu.js`, `README.md`, `scripts/build-game.js`, `scripts/test-phase24.js`  
+**Status:** Complete (Shipped 2026-11-10)
+
+**Plans:**
+- [x] 24-01: In-Game Credits Modal & Semantic Version Synchronization (`PKG-09`)
+- [x] 24-02: Production Compilation Audit & Comprehensive Regression Meta-Verification Harness (`PKG-10`)  
 
 **Measurable Success Criteria (Observable User Behaviors):**
 1. Standalone desktop application, relay server, and updater endpoints report semantic version `1.3.0` consistently across About dialogs, dashboard footers, package manifests, and console logs.
