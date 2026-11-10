@@ -248,12 +248,69 @@ function gameUpdate() {
 	uiFading();
 
 	if (g_state == STATE_PLAYING) {
-		// ESC (27) or P (80) toggles in-game pause
+		// ESC (27) or P (80) toggles in-game pause or closes Field Manual if open (CLIP-06, D-08)
 		if (keyWasPressed(27) || keyWasPressed(80)) {
-			g_isPaused = !g_isPaused;
-			if (g_isPaused) uiSound(1);
+			if (typeof g_startHelpOpen !== "undefined" && g_startHelpOpen) {
+				g_startHelpOpen = false;
+				return;
+			} else {
+				g_isPaused = !g_isPaused;
+				if (g_isPaused) uiSound(1);
+			}
 		}
 		if (g_isPaused) {
+			// [H] key (72) toggles Survivor Field Manual modal while paused (CLIP-06, D-08)
+			if (keyWasPressed(72)) {
+				g_startHelpOpen = !g_startHelpOpen;
+				return;
+			}
+			if (typeof g_startHelpOpen !== "undefined" && g_startHelpOpen) {
+				if (keyWasPressed(49)) g_startHelpTab = 0; // '1'
+				if (keyWasPressed(50)) g_startHelpTab = 1; // '2'
+				if (keyWasPressed(51)) g_startHelpTab = 2; // '3'
+				if (keyWasPressed(37)) g_startHelpTab = (g_startHelpTab + 2) % 3; // Left Arrow
+				if (keyWasPressed(39)) g_startHelpTab = (g_startHelpTab + 1) % 3; // Right Arrow
+				if (keyWasPressed(88) || keyWasPressed(27)) { // 'X' or Esc
+					g_startHelpOpen = false;
+					return;
+				}
+				if (typeof gamepadWasPressed !== "undefined") {
+					if (gamepadWasPressed(4)) g_startHelpTab = (g_startHelpTab + 2) % 3;
+					if (gamepadWasPressed(5)) g_startHelpTab = (g_startHelpTab + 1) % 3;
+					if (gamepadWasPressed(1) || gamepadWasPressed(3)) {
+						g_startHelpOpen = false;
+						return;
+					}
+				}
+				const W = mainCanvas ? mainCanvas.width : 1920;
+				const H = mainCanvas ? mainCanvas.height : 1080;
+				const { safeW, safeH, cx, cy, u } = typeof getStartScreenSafeZone === "function"
+					? getStartScreenSafeZone(W, H)
+					: { safeW: W, safeH: H, cx: W / 2, cy: H / 2, u: Math.max(12, Math.min(W, H) / 40) };
+				const modalW = Math.min(safeW * 0.92, Math.max(1020, u * 38));
+				const modalH = Math.min(safeH * 0.86, Math.max(680, u * 25.5));
+				const modalX = cx - modalW / 2;
+				const modalY = cy - modalH / 2;
+				const headerY = modalY + u * 1.4;
+				const tabY = headerY + u * 1.5;
+				const tabH = u * 1.6;
+				const tabW = (modalW - u * 2.0) / 3;
+				const mPos = typeof mousePosScreen !== "undefined" && mousePosScreen ? mousePosScreen : null;
+				if (typeof mouseWasPressed !== "undefined" && mouseWasPressed(0) && mPos) {
+					for (let i = 0; i < 3; i++) {
+						const tx = modalX + u * 1.0 + i * tabW;
+						if (mPos.x >= tx && mPos.x <= tx + tabW - 4 && mPos.y >= tabY - tabH / 2 && mPos.y <= tabY + tabH / 2) {
+							g_startHelpTab = i;
+							return;
+						}
+					}
+					if (mPos.x < modalX || mPos.x > modalX + modalW || mPos.y < modalY || mPos.y > modalY + modalH || (mPos.y <= modalY + u * 2.2 && mPos.x >= modalX + modalW - u * 8.0)) {
+						g_startHelpOpen = false;
+						return;
+					}
+				}
+				return;
+			}
 			// In desktop mode, 'D' key (68) triggers openDashboard
 			if (keyWasPressed(68) && typeof window !== 'undefined' && window.electronAPI && window.electronAPI.openDashboard) {
 				window.electronAPI.openDashboard();

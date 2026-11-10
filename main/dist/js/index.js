@@ -248,12 +248,69 @@ function gameUpdate() {
 	uiFading();
 
 	if (g_state == STATE_PLAYING) {
-		// ESC (27) or P (80) toggles in-game pause
+		// ESC (27) or P (80) toggles in-game pause or closes Field Manual if open (CLIP-06, D-08)
 		if (keyWasPressed(27) || keyWasPressed(80)) {
-			g_isPaused = !g_isPaused;
-			if (g_isPaused) uiSound(1);
+			if (typeof g_startHelpOpen !== "undefined" && g_startHelpOpen) {
+				g_startHelpOpen = false;
+				return;
+			} else {
+				g_isPaused = !g_isPaused;
+				if (g_isPaused) uiSound(1);
+			}
 		}
 		if (g_isPaused) {
+			// [H] key (72) toggles Survivor Field Manual modal while paused (CLIP-06, D-08)
+			if (keyWasPressed(72)) {
+				g_startHelpOpen = !g_startHelpOpen;
+				return;
+			}
+			if (typeof g_startHelpOpen !== "undefined" && g_startHelpOpen) {
+				if (keyWasPressed(49)) g_startHelpTab = 0; // '1'
+				if (keyWasPressed(50)) g_startHelpTab = 1; // '2'
+				if (keyWasPressed(51)) g_startHelpTab = 2; // '3'
+				if (keyWasPressed(37)) g_startHelpTab = (g_startHelpTab + 2) % 3; // Left Arrow
+				if (keyWasPressed(39)) g_startHelpTab = (g_startHelpTab + 1) % 3; // Right Arrow
+				if (keyWasPressed(88) || keyWasPressed(27)) { // 'X' or Esc
+					g_startHelpOpen = false;
+					return;
+				}
+				if (typeof gamepadWasPressed !== "undefined") {
+					if (gamepadWasPressed(4)) g_startHelpTab = (g_startHelpTab + 2) % 3;
+					if (gamepadWasPressed(5)) g_startHelpTab = (g_startHelpTab + 1) % 3;
+					if (gamepadWasPressed(1) || gamepadWasPressed(3)) {
+						g_startHelpOpen = false;
+						return;
+					}
+				}
+				const W = mainCanvas ? mainCanvas.width : 1920;
+				const H = mainCanvas ? mainCanvas.height : 1080;
+				const { safeW, safeH, cx, cy, u } = typeof getStartScreenSafeZone === "function"
+					? getStartScreenSafeZone(W, H)
+					: { safeW: W, safeH: H, cx: W / 2, cy: H / 2, u: Math.max(12, Math.min(W, H) / 40) };
+				const modalW = Math.min(safeW * 0.92, Math.max(1020, u * 38));
+				const modalH = Math.min(safeH * 0.86, Math.max(680, u * 25.5));
+				const modalX = cx - modalW / 2;
+				const modalY = cy - modalH / 2;
+				const headerY = modalY + u * 1.4;
+				const tabY = headerY + u * 1.5;
+				const tabH = u * 1.6;
+				const tabW = (modalW - u * 2.0) / 3;
+				const mPos = typeof mousePosScreen !== "undefined" && mousePosScreen ? mousePosScreen : null;
+				if (typeof mouseWasPressed !== "undefined" && mouseWasPressed(0) && mPos) {
+					for (let i = 0; i < 3; i++) {
+						const tx = modalX + u * 1.0 + i * tabW;
+						if (mPos.x >= tx && mPos.x <= tx + tabW - 4 && mPos.y >= tabY - tabH / 2 && mPos.y <= tabY + tabH / 2) {
+							g_startHelpTab = i;
+							return;
+						}
+					}
+					if (mPos.x < modalX || mPos.x > modalX + modalW || mPos.y < modalY || mPos.y > modalY + modalH || (mPos.y <= modalY + u * 2.2 && mPos.x >= modalX + modalW - u * 8.0)) {
+						g_startHelpOpen = false;
+						return;
+					}
+				}
+				return;
+			}
 			// In desktop mode, 'D' key (68) triggers openDashboard
 			if (keyWasPressed(68) && typeof window !== 'undefined' && window.electronAPI && window.electronAPI.openDashboard) {
 				window.electronAPI.openDashboard();
@@ -7287,42 +7344,59 @@ function gameRenderPost() {
 		const W = mainCanvas.width;
 		const H = mainCanvas.height;
 		const cx = W / 2;
+		const cy = H / 2;
 		const u = Math.max(12, Math.min(W, H) / 40);
+		const { safeW, safeH } = typeof getStartScreenSafeZone === 'function' ? getStartScreenSafeZone(W, H) : { safeW: W, safeH: H };
 
-		// Dimmed overlay
-		uiDrawRectScreen(vec2(cx, H / 2), vec2(W, H), new Color(0, 0, 0, 0.75));
+		if (typeof g_startHelpOpen !== 'undefined' && g_startHelpOpen && typeof renderStartScreenHelpManual === 'function') {
+			renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH);
+		} else {
+			// Dimmed overlay
+			uiDrawRectScreen(vec2(cx, H / 2), vec2(W, H), new Color(0, 0, 0, 0.75));
 
-		// Pause Card
-		const cardW = Math.min(W * 0.72, u * 26);
-		const cardH = H * 0.52;
-		uiDrawRectScreen(vec2(cx, H * 0.5), vec2(cardW + 4, cardH + 4), colorWhite.scale(0.3));
-		uiDrawRectScreen(vec2(cx, H * 0.5), vec2(cardW, cardH), new Color(0.06, 0.06, 0.08, 0.95));
+			// Pause Card
+			const cardW = Math.min(W * 0.72, u * 26);
+			const cardH = H * 0.52;
+			uiDrawRectScreen(vec2(cx, H * 0.5), vec2(cardW + 4, cardH + 4), colorWhite.scale(0.3));
+			uiDrawRectScreen(vec2(cx, H * 0.5), vec2(cardW, cardH), new Color(0.06, 0.06, 0.08, 0.95));
 
-		// Pause Header
-		drawTextWithOutline("GAME PAUSED", vec2(cx, H * 0.36), u * 1.6, colorBlood);
+			// Pause Header
+			drawTextWithOutline("GAME PAUSED", vec2(cx, H * 0.36), u * 1.6, colorBlood);
 
-		// Resume Prompt / Button
-		const resumeY = H * 0.47;
-		drawTextWithOutline("[ RESUME ] (ESC / P)", vec2(cx, resumeY), u * 0.85, colorSpark);
+			// Resume Prompt / Button
+			const resumeY = H * 0.47;
+			drawTextWithOutline("[ RESUME ] (ESC / P)", vec2(cx, resumeY), u * 0.85, colorSpark);
 
-		// Desktop Streamer Dashboard Button (D-13)
-		const hasDesktopAPI = typeof window !== 'undefined' && (window.isDesktop || (window.electronAPI && window.electronAPI.openDashboard));
-		if (hasDesktopAPI) {
-			const dashY = H * 0.58;
-			const btnW = Math.min(W * 0.55, u * 20);
-			const btnH = u * 2.0;
-
-			// Interactive button hover/click detection
+			// Survivor Field Manual Button (CLIP-06, D-08)
+			const manualY = H * 0.52;
+			const mBtnW = Math.min(W * 0.55, u * 20);
+			const mBtnH = u * 1.8;
 			const mX = mousePosScreen ? mousePosScreen.x : (mousePos ? mousePos.x : 0);
 			const mY = mousePosScreen ? mousePosScreen.y : (mousePos ? mousePos.y : 0);
-			const hovered = Math.abs(mX - cx) < btnW / 2 && Math.abs(mY - dashY) < btnH / 2;
+			const manualHover = Math.abs(mX - cx) < mBtnW / 2 && Math.abs(mY - manualY) < mBtnH / 2;
+			uiDrawRectScreen(vec2(cx, manualY), vec2(mBtnW, mBtnH), manualHover ? colorBullet.scale(0.4) : colorWhite.scale(0.12));
+			drawTextWithOutline("[H] SURVIVOR FIELD MANUAL", vec2(cx, manualY), u * 0.75, manualHover ? colorSpark : colorWhite);
+			if (manualHover && mouseWasPressed(0)) {
+				g_startHelpOpen = true;
+			}
 
-			uiDrawRectScreen(vec2(cx, dashY), vec2(btnW, btnH), hovered ? colorBullet.scale(0.4) : colorWhite.scale(0.12));
-			drawTextWithOutline("★ OPEN APG DASHBOARD (D) ★", vec2(cx, dashY), u * 0.75, hovered ? colorSpark : colorWhite);
+			// Desktop Streamer Dashboard Button (D-13)
+			const hasDesktopAPI = typeof window !== 'undefined' && (window.isDesktop || (window.electronAPI && window.electronAPI.openDashboard));
+			if (hasDesktopAPI) {
+				const dashY = H * 0.62;
+				const btnW = Math.min(W * 0.55, u * 20);
+				const btnH = u * 2.0;
 
-			if (hovered && mouseWasPressed(0)) {
-				if (window.electronAPI && window.electronAPI.openDashboard) {
-					window.electronAPI.openDashboard();
+				// Interactive button hover/click detection
+				const hovered = Math.abs(mX - cx) < btnW / 2 && Math.abs(mY - dashY) < btnH / 2;
+
+				uiDrawRectScreen(vec2(cx, dashY), vec2(btnW, btnH), hovered ? colorBullet.scale(0.4) : colorWhite.scale(0.12));
+				drawTextWithOutline("★ OPEN APG DASHBOARD (D) ★", vec2(cx, dashY), u * 0.75, hovered ? colorSpark : colorWhite);
+
+				if (hovered && mouseWasPressed(0)) {
+					if (window.electronAPI && window.electronAPI.openDashboard) {
+						window.electronAPI.openDashboard();
+					}
 				}
 			}
 		}

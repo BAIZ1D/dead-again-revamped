@@ -642,42 +642,59 @@ function gameRenderPost() {
 		const W = mainCanvas.width;
 		const H = mainCanvas.height;
 		const cx = W / 2;
+		const cy = H / 2;
 		const u = Math.max(12, Math.min(W, H) / 40);
+		const { safeW, safeH } = typeof getStartScreenSafeZone === 'function' ? getStartScreenSafeZone(W, H) : { safeW: W, safeH: H };
 
-		// Dimmed overlay
-		uiDrawRectScreen(vec2(cx, H / 2), vec2(W, H), new Color(0, 0, 0, 0.75));
+		if (typeof g_startHelpOpen !== 'undefined' && g_startHelpOpen && typeof renderStartScreenHelpManual === 'function') {
+			renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH);
+		} else {
+			// Dimmed overlay
+			uiDrawRectScreen(vec2(cx, H / 2), vec2(W, H), new Color(0, 0, 0, 0.75));
 
-		// Pause Card
-		const cardW = Math.min(W * 0.72, u * 26);
-		const cardH = H * 0.52;
-		uiDrawRectScreen(vec2(cx, H * 0.5), vec2(cardW + 4, cardH + 4), colorWhite.scale(0.3));
-		uiDrawRectScreen(vec2(cx, H * 0.5), vec2(cardW, cardH), new Color(0.06, 0.06, 0.08, 0.95));
+			// Pause Card
+			const cardW = Math.min(W * 0.72, u * 26);
+			const cardH = H * 0.52;
+			uiDrawRectScreen(vec2(cx, H * 0.5), vec2(cardW + 4, cardH + 4), colorWhite.scale(0.3));
+			uiDrawRectScreen(vec2(cx, H * 0.5), vec2(cardW, cardH), new Color(0.06, 0.06, 0.08, 0.95));
 
-		// Pause Header
-		drawTextWithOutline("GAME PAUSED", vec2(cx, H * 0.36), u * 1.6, colorBlood);
+			// Pause Header
+			drawTextWithOutline("GAME PAUSED", vec2(cx, H * 0.36), u * 1.6, colorBlood);
 
-		// Resume Prompt / Button
-		const resumeY = H * 0.47;
-		drawTextWithOutline("[ RESUME ] (ESC / P)", vec2(cx, resumeY), u * 0.85, colorSpark);
+			// Resume Prompt / Button
+			const resumeY = H * 0.47;
+			drawTextWithOutline("[ RESUME ] (ESC / P)", vec2(cx, resumeY), u * 0.85, colorSpark);
 
-		// Desktop Streamer Dashboard Button (D-13)
-		const hasDesktopAPI = typeof window !== 'undefined' && (window.isDesktop || (window.electronAPI && window.electronAPI.openDashboard));
-		if (hasDesktopAPI) {
-			const dashY = H * 0.58;
-			const btnW = Math.min(W * 0.55, u * 20);
-			const btnH = u * 2.0;
-
-			// Interactive button hover/click detection
+			// Survivor Field Manual Button (CLIP-06, D-08)
+			const manualY = H * 0.52;
+			const mBtnW = Math.min(W * 0.55, u * 20);
+			const mBtnH = u * 1.8;
 			const mX = mousePosScreen ? mousePosScreen.x : (mousePos ? mousePos.x : 0);
 			const mY = mousePosScreen ? mousePosScreen.y : (mousePos ? mousePos.y : 0);
-			const hovered = Math.abs(mX - cx) < btnW / 2 && Math.abs(mY - dashY) < btnH / 2;
+			const manualHover = Math.abs(mX - cx) < mBtnW / 2 && Math.abs(mY - manualY) < mBtnH / 2;
+			uiDrawRectScreen(vec2(cx, manualY), vec2(mBtnW, mBtnH), manualHover ? colorBullet.scale(0.4) : colorWhite.scale(0.12));
+			drawTextWithOutline("[H] SURVIVOR FIELD MANUAL", vec2(cx, manualY), u * 0.75, manualHover ? colorSpark : colorWhite);
+			if (manualHover && mouseWasPressed(0)) {
+				g_startHelpOpen = true;
+			}
 
-			uiDrawRectScreen(vec2(cx, dashY), vec2(btnW, btnH), hovered ? colorBullet.scale(0.4) : colorWhite.scale(0.12));
-			drawTextWithOutline("★ OPEN APG DASHBOARD (D) ★", vec2(cx, dashY), u * 0.75, hovered ? colorSpark : colorWhite);
+			// Desktop Streamer Dashboard Button (D-13)
+			const hasDesktopAPI = typeof window !== 'undefined' && (window.isDesktop || (window.electronAPI && window.electronAPI.openDashboard));
+			if (hasDesktopAPI) {
+				const dashY = H * 0.62;
+				const btnW = Math.min(W * 0.55, u * 20);
+				const btnH = u * 2.0;
 
-			if (hovered && mouseWasPressed(0)) {
-				if (window.electronAPI && window.electronAPI.openDashboard) {
-					window.electronAPI.openDashboard();
+				// Interactive button hover/click detection
+				const hovered = Math.abs(mX - cx) < btnW / 2 && Math.abs(mY - dashY) < btnH / 2;
+
+				uiDrawRectScreen(vec2(cx, dashY), vec2(btnW, btnH), hovered ? colorBullet.scale(0.4) : colorWhite.scale(0.12));
+				drawTextWithOutline("★ OPEN APG DASHBOARD (D) ★", vec2(cx, dashY), u * 0.75, hovered ? colorSpark : colorWhite);
+
+				if (hovered && mouseWasPressed(0)) {
+					if (window.electronAPI && window.electronAPI.openDashboard) {
+						window.electronAPI.openDashboard();
+					}
 				}
 			}
 		}
