@@ -6071,6 +6071,90 @@ function renderStartScreenBadges(cx, H, u, safeW) {
     overlayContext.restore();
 }
 
+// Universal Multi-Line Canvas 2D Word-Wrapping Engine (CLIP-06, D-05)
+function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxHeight) {
+    if (!ctx || text == null || text === '') {
+        return { linesRendered: 0, nextY: y, heightUsed: 0 };
+    }
+
+    const fontStr = String(ctx.font || '');
+    const fontMatch = fontStr.match(/([\d.]+)px/);
+    const fontSize = fontMatch ? parseFloat(fontMatch[1]) : 14;
+    const safeMaxW = Math.max(1, maxWidth || 100);
+
+    const measureCandidate = (str) => {
+        const ctxW = ctx.measureText ? ctx.measureText(str).width : 0;
+        return Math.max(ctxW, str.length * fontSize * 0.56);
+    };
+
+    const buildWrappedLines = () => {
+        const paragraphs = String(text).split('\n');
+        const lines = [];
+        for (let p = 0; p < paragraphs.length; p++) {
+            const para = paragraphs[p];
+            if (para.trim() === '') {
+                lines.push('');
+                continue;
+            }
+            const words = para.trim().split(/\s+/);
+            let currentLine = '';
+            for (let w = 0; w < words.length; w++) {
+                const word = words[w];
+                const testLine = currentLine ? (currentLine + ' ' + word) : word;
+                const testW = measureCandidate(testLine);
+                if (testW <= safeMaxW || currentLine === '') {
+                    currentLine = testLine;
+                } else {
+                    lines.push(currentLine);
+                    currentLine = word;
+                }
+            }
+            if (currentLine !== '') {
+                lines.push(currentLine);
+            }
+        }
+        return lines;
+    };
+
+    let wrappedLines = buildWrappedLines();
+
+    if (maxHeight && maxHeight > 0 && wrappedLines.length * lineHeight > maxHeight) {
+        const scale = maxHeight / (wrappedLines.length * lineHeight);
+        if (scale >= 0.8) {
+            const scaledFontSize = Math.max(8, Math.floor(fontSize * scale));
+            const scaledLineHeight = Math.max(8, Math.floor(lineHeight * scale));
+            if (scaledFontSize < fontSize && scaledLineHeight < lineHeight && fontMatch) {
+                const prevFont = ctx.font;
+                ctx.font = fontStr.replace(/([\d.]+)px/, scaledFontSize + 'px');
+                const res = drawWrappedText(ctx, text, x, y, maxWidth, scaledLineHeight, 0);
+                ctx.font = prevFont;
+                if (res.heightUsed <= maxHeight) {
+                    return res;
+                }
+            }
+        }
+        const maxLines = Math.max(1, Math.floor(maxHeight / lineHeight));
+        if (wrappedLines.length > maxLines) {
+            wrappedLines = wrappedLines.slice(0, maxLines);
+            wrappedLines[maxLines - 1] = wrappedLines[maxLines - 1].replace(/[.\s]+$/, '') + '...';
+        }
+    }
+
+    const prevBaseline = ctx.textBaseline;
+    ctx.textBaseline = 'top';
+    for (let i = 0; i < wrappedLines.length; i++) {
+        ctx.fillText(wrappedLines[i], x, y + i * lineHeight);
+    }
+    ctx.textBaseline = prevBaseline;
+
+    const heightUsed = wrappedLines.length * lineHeight;
+    return {
+        linesRendered: wrappedLines.length,
+        nextY: y + heightUsed,
+        heightUsed: heightUsed
+    };
+}
+
 // Tab 1: Weapon Stat Cards & Health Telemetry
 function renderHelpTabWeapons(x, y, w, h, u) {
     const cardW = (w - u * 0.8) / 2;
@@ -6276,9 +6360,9 @@ function renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH) {
     overlayContext.fillStyle = 'rgba(5, 2, 4, 0.78)';
     overlayContext.fillRect(0, 0, W, H);
 
-    // 2. Terminal Card Container
-    const modalW = Math.min(safeW * 0.92, 1020);
-    const modalH = Math.min(safeH * 0.86, 680);
+    // 2. Terminal Card Container (CLIP-06, D-06: responsive HiDPI scaling)
+    const modalW = Math.min(safeW * 0.92, Math.max(1020, u * 38));
+    const modalH = Math.min(safeH * 0.86, Math.max(680, u * 25.5));
     const modalX = cx - modalW / 2;
     const modalY = cy - modalH / 2;
 
@@ -6302,7 +6386,10 @@ function renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH) {
     overlayContext.font = `bold ${Math.max(11, u * 0.58)}px ${fontDefault}`;
     overlayContext.textAlign = 'right';
     overlayContext.fillStyle = '#E8DDFF';
-    overlayContext.fillText("[ESC / X] RETURN TO START", modalX + modalW - u * 1.0, headerY);
+    const closeLabel = (typeof g_state !== 'undefined' && g_state === STATE_PLAYING)
+        ? "[ESC / X] RETURN TO GAME"
+        : "[ESC / X] RETURN TO START";
+    overlayContext.fillText(closeLabel, modalX + modalW - u * 1.0, headerY);
 
     // 4. Tab Header Navigation Bar
     const tabY = headerY + u * 1.5;
@@ -6405,9 +6492,9 @@ function updateStartScreen() {
     const clicked = (typeof mouseWasPressed !== 'undefined') ? mouseWasPressed(0) : false;
 
     if (g_startHelpOpen) {
-        // Field Manual Modal Input Routing
-        const modalW = Math.min(safeW * 0.92, 1020);
-        const modalH = Math.min(safeH * 0.86, 680);
+        // Field Manual Modal Input Routing (CLIP-06, D-06: synchronized HiDPI bounds)
+        const modalW = Math.min(safeW * 0.92, Math.max(1020, u * 38));
+        const modalH = Math.min(safeH * 0.86, Math.max(680, u * 25.5));
         const modalX = cx - modalW / 2;
         const modalY = cy - modalH / 2;
         const headerY = modalY + u * 1.4;
@@ -6432,14 +6519,14 @@ function updateStartScreen() {
             }
         }
 
-        // Keyboard: 1, 2, 3, Left/Right arrows, Esc, H
+        // Keyboard: 1, 2, 3, Left/Right arrows, Esc, H, X
         if (typeof keyWasPressed !== 'undefined') {
             if (keyWasPressed(49)) g_startHelpTab = 0; // '1'
             if (keyWasPressed(50)) g_startHelpTab = 1; // '2'
             if (keyWasPressed(51)) g_startHelpTab = 2; // '3'
             if (keyWasPressed(37)) g_startHelpTab = (g_startHelpTab + 2) % 3; // Left Arrow
             if (keyWasPressed(39)) g_startHelpTab = (g_startHelpTab + 1) % 3; // Right Arrow
-            if (keyWasPressed(27) || keyWasPressed(72)) { // Esc or 'H'
+            if (keyWasPressed(27) || keyWasPressed(72) || keyWasPressed(88)) { // Esc, 'H', or 'X'
                 g_startHelpOpen = false;
                 return;
             }
