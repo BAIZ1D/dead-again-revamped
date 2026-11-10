@@ -10,6 +10,14 @@ let g_startLaunchTimer = 0;
 let g_startFlashFrames = 0;
 let g_startGamepadDebounce = false;
 let g_startMoonPulseFrames = 0;
+let g_startModalSpringFrames = 0;
+let g_startUserInteracted = false;
+let g_startWindTimer = 780; // 13s initial procedural wind cadence (720-960 frames, D-23)
+let g_startHoverCTA = false;
+let g_startHoverGuide = false;
+
+// Tab Pitch Multiplier Table for Compendium Navigation Chirps (D-24)
+const START_TAB_PITCH_RATES = [1.0, 1.12, 1.25];
 
 // Classic 4x4 Bayer Ordered Dither Matrix normalized [0..15] / 16 (D-11)
 const START_BAYER_4X4 = [
@@ -588,6 +596,83 @@ function renderStartGraveyard(W, H, u, safeW, safeH, plane) {
     overlayContext.restore();
 }
 
+// 3-Layer Parallax Pixel Fog Config Table (VIS-04, D-13..D-16)
+const START_FOG_LAYERS = [
+    { speed: 0.25, color: 'rgba(32, 22, 50, 0.18)', baseOffset: 0.035, freq1: 0.0045, freq2: 0.0110, phase: 0.0, bandH: 3.4 },
+    { speed: 0.60, color: 'rgba(45, 30, 68, 0.26)', baseOffset: 0.055, freq1: 0.0062, freq2: 0.0145, phase: 2.1, bandH: 2.9 },
+    { speed: 1.05, color: 'rgba(62, 42, 90, 0.35)', baseOffset: 0.080, freq1: 0.0080, freq2: 0.0185, phase: 4.3, bandH: 2.4 }
+];
+
+// Evaluate Parallax Fog Wave Crest Y (Strictly Constrained Below CTA Cartouche Baseline, D-14)
+function getStartFogCrestY(x, W, H, u, layerIdx) {
+    const cfg = START_FOG_LAYERS[layerIdx] || START_FOG_LAYERS[0];
+    const amp = Math.max(3, Math.round(u * 0.18));
+    const vStep = 4; // Quantized 3-4px vertical pixel step (D-16)
+    const driftX = x - frame * cfg.speed;
+    const wave = Math.sin(driftX * cfg.freq1 + cfg.phase) * 0.65 + Math.cos(driftX * cfg.freq2 - cfg.phase) * 0.35;
+
+    const ctaH = u * 2.3;
+    const ctaBottom = H * 0.74 + ctaH / 2;
+    const minCrestY = ctaBottom + Math.max(4, stepFloor(u * 0.20));
+    const rawY = H * (0.76 + cfg.baseOffset) + wave * amp;
+    const quantizedY = Math.round(rawY / vStep) * vStep;
+    return Math.max(minCrestY, quantizedY);
+}
+
+function stepFloor(v) {
+    return Math.floor(v);
+}
+
+// 3-Layer Parallax Drifting Pixel Fog Engine (VIS-04, D-13..D-16, D-20)
+function renderStartParallaxFog(W, H, u, layer) {
+    if (typeof overlayContext === 'undefined' || !overlayContext) return;
+    const targetLayer = (typeof layer === 'number') ? layer : 0;
+    overlayContext.save();
+
+    const hStep = Math.max(8, Math.round(u * 0.5));
+    const ditherBlock = Math.max(3, Math.round(u * 0.2));
+    const vStep = 4; // Quantized 4px vertical step
+
+    const renderSingleFogLayer = (layerIdx) => {
+        const cfg = START_FOG_LAYERS[layerIdx];
+        if (!cfg) return;
+        const ribbonDepth = Math.round((cfg.bandH * u) / vStep) * vStep;
+        overlayContext.fillStyle = cfg.color;
+
+        const driftCols = Math.floor((frame * cfg.speed) / ditherBlock);
+        let colIdx = 0;
+        for (let x = 0; x < W; x += hStep) {
+            const colW = Math.min(hStep, W - x);
+            const crestY = getStartFogCrestY(x, W, H, u, layerIdx);
+            const bodyY = crestY + vStep;
+            const bodyH = Math.min(H - bodyY, ribbonDepth);
+
+            if (bodyH > 0) {
+                overlayContext.fillRect(x, bodyY, colW, bodyH);
+            }
+
+            // Alternating 1-in-2 Bayer dithered pixels along upper crest edge row (D-16)
+            for (let dx = x; dx < x + colW; dx += ditherBlock) {
+                const subCol = ((dx / ditherBlock) | 0) - driftCols;
+                if ((subCol & 1) === 0) {
+                    overlayContext.fillRect(dx, crestY, Math.min(ditherBlock, x + colW - dx), vStep);
+                }
+            }
+            colIdx++;
+        }
+    };
+
+    if (targetLayer >= 1 && targetLayer <= 3) {
+        renderSingleFogLayer(targetLayer - 1);
+    } else {
+        renderSingleFogLayer(0);
+        renderSingleFogLayer(1);
+        renderSingleFogLayer(2);
+    }
+
+    overlayContext.restore();
+}
+
 // 16:9 Virtual Safe Zone Clamping (D-15)
 function getStartScreenSafeZone(canvasW, canvasH) {
     const targetAspect = 16 / 9;
@@ -1010,8 +1095,9 @@ function renderStartSubtitleRibbon(cx, subY, subW, subH, u) {
 
     // Specular sheen sweep every 4s (240 frames) during first 1.0s (60 frames)
     const cycle = frame % 240;
-    if (cycle < 60) {
-        const sweepProgress = cycle / 60; // 0 to 1
+    const sheenWindow = (g_startHoverCTA || g_startHoverGuide) ? 35 : 60;
+    if (cycle < sheenWindow) {
+        const sweepProgress = cycle / sheenWindow; // 0 to 1
         const sweepX = (cx - halfW) + sweepProgress * (subW + 60);
 
         overlayContext.save();
@@ -1097,13 +1183,16 @@ function renderStartScreenBadges(cx, H, u, safeW) {
     overlayContext.fillStyle = 'rgba(12, 14, 18, 0.94)';
     overlayContext.fill();
 
-    // Glowing neon border alternating between Gold and Crimson
+    // Glowing neon border alternating between Gold and Crimson (hover glow surge 0.45 -> 0.85, D-26)
     const borderMix = 0.5 + 0.5 * Math.sin(frame * 0.12);
     const neonColor = borderMix > 0.5 ? '#FBF236' : '#AC3232';
+    const ctaGlowAlpha = g_startHoverCTA ? 0.85 : 0.45;
     overlayContext.strokeStyle = neonColor;
     overlayContext.lineWidth = 2.4;
-    overlayContext.shadowColor = neonColor;
-    overlayContext.shadowBlur = 10;
+    overlayContext.shadowColor = borderMix > 0.5
+        ? `rgba(251, 242, 54, ${ctaGlowAlpha})`
+        : `rgba(172, 50, 50, ${ctaGlowAlpha})`;
+    overlayContext.shadowBlur = g_startHoverCTA ? 16 : 10;
     overlayContext.stroke();
     overlayContext.shadowBlur = 0;
 
@@ -1116,16 +1205,22 @@ function renderStartScreenBadges(cx, H, u, safeW) {
     overlayContext.fillText(ctaText, 0, 0);
     overlayContext.restore();
 
-    // 3. Secondary CTA: "[H] HOW TO PLAY & GUIDE" Button (D-11)
+    // 3. Secondary CTA: "[H] HOW TO PLAY & GUIDE" Button (D-11, D-26)
     const guideY = H * 0.83;
     const guideW = Math.min(safeW * 0.50, u * 15);
     const guideH = u * 1.7;
+    const guideGlowAlpha = g_startHoverGuide ? 0.85 : 0.45;
 
+    overlayContext.save();
     overlayContext.fillStyle = 'rgba(22, 27, 34, 0.88)';
     overlayContext.fillRect(cx - guideW / 2, guideY - guideH / 2, guideW, guideH);
     overlayContext.strokeStyle = '#FBF236';
     overlayContext.lineWidth = 1.4;
+    overlayContext.shadowColor = `rgba(251, 242, 54, ${guideGlowAlpha})`;
+    overlayContext.shadowBlur = g_startHoverGuide ? 12 : 4;
     overlayContext.strokeRect(cx - guideW / 2, guideY - guideH / 2, guideW, guideH);
+    overlayContext.shadowBlur = 0;
+    overlayContext.restore();
 
     drawTextWithOutline("[H] HOW TO PLAY & GUIDE", vec2(cx, guideY), Math.max(11, u * 0.62), colorSpark);
 
@@ -1549,7 +1644,7 @@ function renderHelpTabStreamer(x, y, w, h, u) {
     drawWrappedText(overlayContext, "DYNAMIC VIEWER SCALING: Relay server adjusts charge gauges and cooldowns (4.0s !boss, 8.0s !blackout). Gauges: Solo (≤3) = 1 vote; Classroom (4–30) = 3–8 votes; Chaos (>30) = 5–15 votes.\nSTREAMER DASHBOARD: Press Cmd+D (Mac) or Ctrl+D (Win) / F1 to manage predictions, mock audience swarms, and channel settings.\nOBS CAPTURE: Zero overlays needed. Add Window Capture targeting 'Dead Again - Revamped (Twitch Edition)'.", botRx + u * 0.6, botY + u * 0.95, botW - u * 1.2, Math.max(9.0, u * 0.40), botH - u * 1.1);
 }
 
-// Tabbed In-Game Field Manual & Streamer Guide (D-11, D-12, D-17)
+// Tabbed In-Game Field Manual & Streamer Guide (D-11, D-12, D-17, D-22)
 function renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH) {
     if (!g_startHelpOpen) return;
     if (typeof overlayContext === 'undefined' || !overlayContext) return;
@@ -1559,6 +1654,16 @@ function renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH) {
     // 1. Dark Backdrop Dimming
     overlayContext.fillStyle = 'rgba(5, 2, 4, 0.78)';
     overlayContext.fillRect(0, 0, W, H);
+
+    // Snappy 4-frame visual spring scale (0.96 -> 1.00) and alpha (0 -> 1.0) on open (D-22)
+    if (g_startModalSpringFrames > 0) {
+        const springProgress = Math.max(0.25, (4 - g_startModalSpringFrames + 1) / 4);
+        const modalScale = 0.96 + 0.04 * springProgress;
+        overlayContext.translate(cx, cy);
+        overlayContext.scale(modalScale, modalScale);
+        overlayContext.translate(-cx, -cy);
+        overlayContext.globalAlpha = springProgress;
+    }
 
     // 2. Terminal Card Container (CLIP-06, D-06: responsive HiDPI scaling)
     const modalW = Math.min(safeW * 0.92, Math.max(1020, u * 38));
@@ -1638,14 +1743,32 @@ function renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH) {
     overlayContext.restore();
 }
 
-// Field Manual Backward Compatibility Helpers (HELP-01..HELP-03, D-02)
+// Field Manual Backward Compatibility Helpers (HELP-01..HELP-03, D-02, D-24)
 function renderFieldManualModal(W, H, cx, cy, u, safeW, safeH) {
     renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH);
+}
+
+function playStartTabChirp(tabIndex) {
+    const pitch = START_TAB_PITCH_RATES[tabIndex] || 1.0;
+    const sPos = (typeof cameraPos !== 'undefined' && cameraPos) ? cameraPos : vec2(0, 0);
+    if (typeof soundCountdownBeep !== 'undefined' && soundCountdownBeep && soundCountdownBeep.play) {
+        soundCountdownBeep.play(sPos, 0.85, pitch);
+    }
+}
+
+function triggerStartAmbientWindWhisper() {
+    const sPos = (typeof cameraPos !== 'undefined' && cameraPos) ? cameraPos : vec2(0, 0);
+    if (typeof zzfx === 'function') {
+        zzfx(0.08, 0.05, 85, 0.35, 1.15, 0.85, 4, 1.2, 0.3, -0.2, 0, 0, 0, 0.4, 0, 0, 0.1, 0.65, 0.25);
+    } else if (typeof soundGhostGroan !== 'undefined' && soundGhostGroan && soundGhostGroan.play) {
+        soundGhostGroan.play(sPos, 0.08, 0.65);
+    }
 }
 
 function switchTab(newTab) {
     if (typeof newTab === 'number' && newTab >= 0 && newTab <= 2) {
         g_startHelpTab = newTab;
+        playStartTabChirp(newTab);
     }
 }
 
@@ -1695,11 +1818,25 @@ function triggerStartTheatricalLaunch() {
     }, 360);
 }
 
-// Unified Multi-Input Handling (D-13)
+// Unified Multi-Input Handling (D-13, D-22..D-26)
 function updateStartScreen() {
     const W = mainCanvas ? mainCanvas.width : 1920;
     const H = mainCanvas ? mainCanvas.height : 1080;
     const { safeW, safeH, cx, cy, u } = getStartScreenSafeZone(W, H);
+
+    // Decrement 4-frame modal spring animation counter (D-22)
+    if (g_startModalSpringFrames > 0) {
+        g_startModalSpringFrames--;
+    }
+
+    // Periodic procedural ZzFX ambient graveyard wind whisper every 12-16s (720-960 frames) after interaction (D-23)
+    if (g_startUserInteracted) {
+        g_startWindTimer--;
+        if (g_startWindTimer <= 0) {
+            triggerStartAmbientWindWhisper();
+            g_startWindTimer = 720 + Math.floor(Math.random() * 241);
+        }
+    }
 
     // Flash countdown
     if (g_startFlashFrames > 0) {
@@ -1714,8 +1851,13 @@ function updateStartScreen() {
 
     const mPos = (typeof mousePosScreen !== 'undefined' && mousePosScreen) ? mousePosScreen : null;
     const clicked = (typeof mouseWasPressed !== 'undefined') ? mouseWasPressed(0) : false;
+    if (clicked) g_startUserInteracted = true;
 
     if (g_startHelpOpen) {
+        g_startHoverCTA = false;
+        g_startHoverGuide = false;
+        if (mainCanvas && mainCanvas.style) mainCanvas.style.cursor = 'default';
+
         // Field Manual Modal Input Routing (CLIP-06, D-06: synchronized HiDPI bounds)
         const modalW = Math.min(safeW * 0.92, Math.max(1020, u * 38));
         const modalH = Math.min(safeH * 0.86, Math.max(680, u * 25.5));
@@ -1732,36 +1874,39 @@ function updateStartScreen() {
                 const tx = modalX + u * 1.0 + i * tabW;
                 if (mPos.x >= tx && mPos.x <= tx + tabW - 4 && mPos.y >= tabY - tabH / 2 && mPos.y <= tabY + tabH / 2) {
                     g_startHelpTab = i;
-                    if (typeof soundCountdownBeep !== 'undefined' && soundCountdownBeep.play) soundCountdownBeep.play();
+                    playStartTabChirp(i);
                     return;
                 }
             }
             // Close button / backdrop click
             if (mPos.x < modalX || mPos.x > modalX + modalW || mPos.y < modalY || mPos.y > modalY + modalH || (mPos.y <= modalY + u * 2.2 && mPos.x >= modalX + modalW - u * 8.0)) {
                 g_startHelpOpen = false;
+                g_startModalSpringFrames = 0;
                 return;
             }
         }
 
-        // Keyboard: 1, 2, 3, Left/Right arrows, Esc, H, X
+        // Keyboard: 1, 2, 3, Left/Right arrows, Esc, H, X (with pitch-shifted chirps, D-24)
         if (typeof keyWasPressed !== 'undefined') {
-            if (keyWasPressed(49)) g_startHelpTab = 0; // '1'
-            if (keyWasPressed(50)) g_startHelpTab = 1; // '2'
-            if (keyWasPressed(51)) g_startHelpTab = 2; // '3'
-            if (keyWasPressed(37)) g_startHelpTab = (g_startHelpTab + 2) % 3; // Left Arrow
-            if (keyWasPressed(39)) g_startHelpTab = (g_startHelpTab + 1) % 3; // Right Arrow
+            if (keyWasPressed(49)) { g_startUserInteracted = true; g_startHelpTab = 0; playStartTabChirp(0); } // '1'
+            if (keyWasPressed(50)) { g_startUserInteracted = true; g_startHelpTab = 1; playStartTabChirp(1); } // '2'
+            if (keyWasPressed(51)) { g_startUserInteracted = true; g_startHelpTab = 2; playStartTabChirp(2); } // '3'
+            if (keyWasPressed(37)) { g_startUserInteracted = true; g_startHelpTab = (g_startHelpTab + 2) % 3; playStartTabChirp(g_startHelpTab); } // Left Arrow
+            if (keyWasPressed(39)) { g_startUserInteracted = true; g_startHelpTab = (g_startHelpTab + 1) % 3; playStartTabChirp(g_startHelpTab); } // Right Arrow
             if (keyWasPressed(27) || keyWasPressed(72) || keyWasPressed(88)) { // Esc, 'H', or 'X'
                 g_startHelpOpen = false;
+                g_startModalSpringFrames = 0;
                 return;
             }
         }
 
         // Gamepad: LB (4) / RB (5) switch tabs, B (1) / Y (3) close
         if (typeof gamepadWasPressed !== 'undefined') {
-            if (gamepadWasPressed(4)) g_startHelpTab = (g_startHelpTab + 2) % 3;
-            if (gamepadWasPressed(5)) g_startHelpTab = (g_startHelpTab + 1) % 3;
+            if (gamepadWasPressed(4)) { g_startUserInteracted = true; g_startHelpTab = (g_startHelpTab + 2) % 3; playStartTabChirp(g_startHelpTab); }
+            if (gamepadWasPressed(5)) { g_startUserInteracted = true; g_startHelpTab = (g_startHelpTab + 1) % 3; playStartTabChirp(g_startHelpTab); }
             if (gamepadWasPressed(1) || gamepadWasPressed(3)) {
                 g_startHelpOpen = false;
+                g_startModalSpringFrames = 0;
                 return;
             }
         }
@@ -1781,10 +1926,24 @@ function updateStartScreen() {
         g_startMoonPulseFrames--;
     }
 
+    // Hover state detection for CTA cartouche, [H] button, and Moon (D-26)
+    const { moonX, moonY, moonR } = getStartMoonMetrics(W, H, u, safeW, safeH);
+    if (mPos) {
+        g_startHoverCTA = Math.abs(mPos.x - cx) < ctaW / 2 && Math.abs(mPos.y - ctaY) < ctaH / 2;
+        g_startHoverGuide = Math.abs(mPos.x - cx) < guideW / 2 && Math.abs(mPos.y - guideY) < guideH / 2;
+        const hoverMoon = Math.hypot(mPos.x - moonX, mPos.y - moonY) <= moonR * 1.35;
+        if (mainCanvas && mainCanvas.style) {
+            if (g_startHoverCTA || g_startHoverGuide || hoverMoon) {
+                mainCanvas.style.cursor = 'pointer';
+            } else {
+                mainCanvas.style.cursor = 'default';
+            }
+        }
+    }
+
     // Mouse click detection
     if (clicked && mPos) {
         // Clicked Moon Easter Egg (D-25)
-        const { moonX, moonY, moonR } = getStartMoonMetrics(W, H, u, safeW, safeH);
         const moonDist = Math.hypot(mPos.x - moonX, mPos.y - moonY);
         if (moonDist <= moonR * 1.35) {
             g_startMoonPulseFrames = 10;
@@ -1797,7 +1956,8 @@ function updateStartScreen() {
         // Clicked Help Button
         if (Math.abs(mPos.x - cx) < guideW / 2 && Math.abs(mPos.y - guideY) < guideH / 2) {
             g_startHelpOpen = true;
-            if (typeof soundCountdownBeep !== 'undefined' && soundCountdownBeep.play) soundCountdownBeep.play();
+            g_startModalSpringFrames = 4;
+            playStartTabChirp(g_startHelpTab);
             return;
         }
         // Clicked CTA Cartouche
@@ -1810,12 +1970,15 @@ function updateStartScreen() {
     // Keyboard: Enter (13) or Space (32) starts; H (72) opens Help
     if (typeof keyWasPressed !== 'undefined') {
         if (keyWasPressed(13) || keyWasPressed(32)) {
+            g_startUserInteracted = true;
             triggerStartTheatricalLaunch();
             return;
         }
         if (keyWasPressed(72)) {
+            g_startUserInteracted = true;
             g_startHelpOpen = true;
-            if (typeof soundCountdownBeep !== 'undefined' && soundCountdownBeep.play) soundCountdownBeep.play();
+            g_startModalSpringFrames = 4;
+            playStartTabChirp(g_startHelpTab);
             return;
         }
     }
@@ -1823,18 +1986,21 @@ function updateStartScreen() {
     // Gamepad: A (0) starts; Y (3) opens Help
     if (typeof gamepadWasPressed !== 'undefined') {
         if (gamepadWasPressed(0)) {
+            g_startUserInteracted = true;
             triggerStartTheatricalLaunch();
             return;
         }
         if (gamepadWasPressed(3)) {
+            g_startUserInteracted = true;
             g_startHelpOpen = true;
-            if (typeof soundCountdownBeep !== 'undefined' && soundCountdownBeep.play) soundCountdownBeep.play();
+            g_startModalSpringFrames = 4;
+            playStartTabChirp(g_startHelpTab);
             return;
         }
     }
 }
 
-// Master Render Entry Point: Isolated inside save() and restore() (D-09)
+// Master Render Entry Point: 15-Step Atmospheric Depth Sandwich Z-Stack (D-17, D-18, D-19, D-21)
 function renderStartScreen() {
     if (!overlayContext) return;
     const W = mainCanvas ? mainCanvas.width : 1920;
@@ -1843,38 +2009,70 @@ function renderStartScreen() {
 
     overlayContext.save();
 
-    // 1. Atmosphere (CRT Scanlines & Radial Vignette, D-06)
-    renderStartAtmosphere(W, H, cx, cy);
+    // Step 1: Deep Midnight Sky Background Gradient (#12081C at zenith down to #090A10 at horizon, D-17, D-20)
+    const skyGrad = overlayContext.createLinearGradient(0, 0, 0, H);
+    skyGrad.addColorStop(0, '#12081C');
+    skyGrad.addColorStop(0.68, '#0D0916');
+    skyGrad.addColorStop(1, '#090A10');
+    overlayContext.fillStyle = skyGrad;
+    overlayContext.fillRect(0, 0, W, H);
 
-    // 2. 24 Rising Ember Particles (D-05, D-16)
+    // Step 2: Bayer-Dithered Blood/Harvest Moon & Twin Pulsating Halo Rings (VIS-03, D-09..D-12)
+    renderStartMoon(cx, cy, u, W, H, safeW, safeH);
+
+    // Step 3: Distant Cathedral Spires & Mausoleums - Plane 1 (VIS-02, D-01, D-07)
+    renderStartGraveyard(W, H, u, safeW, safeH, 1);
+
+    // Step 4: Parallax Fog Layer 1 - Distant Horizon Mist at 0.25 px/f (VIS-04, D-13)
+    renderStartParallaxFog(W, H, u, 1);
+
+    // Step 5: Midground Graveyard, Dead Oaks & Crooked Crosses - Plane 2 (VIS-02, D-01, D-06)
+    renderStartGraveyard(W, H, u, safeW, safeH, 2);
+
+    // Step 6: Parallax Fog Layer 2 - Midground Cemetery Fog at 0.60 px/f (VIS-04, D-13)
+    renderStartParallaxFog(W, H, u, 2);
+
+    // Step 7: Foreground Tombstones, Obelisks & Spiked Iron Railings - Plane 3 (VIS-02, D-01, D-05, D-08)
+    renderStartGraveyard(W, H, u, safeW, safeH, 3);
+
+    // Step 8: Parallax Fog Layer 3 - Foreground Ground Drift at 1.05 px/f (VIS-04, D-13)
+    renderStartParallaxFog(W, H, u, 3);
+
+    // Step 9: 24 Procedural Rising Embers drifting upward in front of graveyard (D-17)
     updateAndRenderStartEmbers(W, H);
 
-    // 3. Heraldic Hero Crest & Crossed Weapons (D-01..D-04)
+    // Step 10: Heraldic Hero Crest, Crossed Shotgun/SMG & Bobbing Faction Portraits (D-17)
     renderStartScreenCrest(cx, cy, u);
 
-    // 4. "DEAD AGAIN" Layered Chromatic Typography (D-09)
+    // Step 11: "DEAD AGAIN" Chromatic Typography & Subtitle Ribbon (D-17)
     const titleY = cy - u * 0.8;
     renderStartTypography(cx, titleY, u);
-
-    // 5. "- REVAMPED (TWITCH EDITION) -" Subtitle Ribbon (D-10)
     const subY = titleY + u * 1.8;
     const subW = Math.min(safeW * 0.68, u * 18);
     const subH = u * 1.4;
     renderStartSubtitleRibbon(cx, subY, subW, subH, u);
 
-    // 6. Badges & Secondary Panels (CTA, Records Ledger, Streamer Hint, D-07, D-08)
+    // Step 12: Arcade CTA Cartouche, Records Ledger & Streamer Shortcut Badges (D-17)
     renderStartScreenBadges(cx, H, u, safeW);
 
-    // 7. Field Manual Modal Overlay (if active, D-11, D-12)
+    // Step 13: Full Arcade CRT Phosphor Scanlines (3px pitch) & Dark-Crimson Perimeter Vignette (D-17, D-19)
+    renderStartAtmosphere(W, H, cx, cy);
+
+    // Step 14: Field Manual Modal Overlay (when open, g_startHelpOpen, D-17, D-22)
     if (g_startHelpOpen) {
         renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH);
     }
 
-    // 8. 12-Frame Transition Flash Wipe (D-15)
+    // Step 15: Enhanced 12-Frame Phosphor Flash Wipe with Blood-Crimson Vignette Decay (D-17, D-21)
     if (g_startFlashFrames > 0) {
-        const flashAlpha = g_startFlashFrames / 12;
-        overlayContext.fillStyle = `rgba(255, 255, 255, ${flashAlpha * 0.85})`;
-        overlayContext.fillRect(0, 0, W, H);
+        if (g_startFlashFrames >= 10) {
+            overlayContext.fillStyle = 'rgba(255, 255, 255, 0.90)';
+            overlayContext.fillRect(0, 0, W, H);
+        } else {
+            const decayAlpha = (g_startFlashFrames / 9) * 0.85;
+            overlayContext.fillStyle = `rgba(172, 50, 50, ${decayAlpha.toFixed(3)})`;
+            overlayContext.fillRect(0, 0, W, H);
+        }
     }
 
     overlayContext.restore();
