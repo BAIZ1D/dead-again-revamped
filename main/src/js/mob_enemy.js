@@ -267,7 +267,9 @@ class Enemy extends Mob {
 					let gunTile = g_player && g_player.gun ? g_player.gun.tileIndex : tileNumbers_pistol;
 					// Radial scatter deconfliction (1.5-2.0 tile search) so multiple crates never overlap (D-23)
 					let dropPos = typeof findScatterDropPos === "function" ? findScatterDropPos(this.pos) : this.pos.copy();
-					new AmmoBox(dropPos, gunTile, this.twitchUser || "NightmareBoss", false, true);
+					let crateBox = new AmmoBox(this.pos.copy(), gunTile, this.twitchUser, false, true);
+					if (crateBox && dropPos) crateBox.pos = dropPos;
+					if (crateBox && !this.twitchUser) crateBox.twitchUser = "NightmareBoss";
 					if (typeof g_apgManager !== "undefined" && g_apgManager) {
 						g_apgManager.onEnemyKilled(this);
 					}

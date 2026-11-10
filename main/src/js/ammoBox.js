@@ -12,7 +12,7 @@ class AmmoBox extends EngineObject {
 
 	constructor(pos, gunType, twitchUser = null, isScavenged = false, isFullPackage = false) {
 		// D-19, D-21: Scavenged clips render at 0.75x tile scale, Full Care Packages at 1.25x scale
-		let boxSize = isScavenged ? vec2(0.75) : isFullPackage ? vec2(1.25) : vec2(1);
+		let boxSize = isFullPackage ? vec2(1.25) : (isScavenged ? vec2(0.75) : vec2(1));
 		super(pos, boxSize, getAmmoForGunType(gunType), TILE_SIZE);
 
 		this._hitbox = vec2(0.5);
@@ -26,7 +26,7 @@ class AmmoBox extends EngineObject {
 	update() {
 		let curFrame = typeof frame !== "undefined" ? frame : 0;
 		// Full Care Packages persist for 60 seconds (3600 frames) per D-22
-		let maxLife = this.isFullPackage ? 3600 : this.isScavenged ? 1500 : this.twitchUser ? 1800 : Infinity;
+		let maxLife = this.isFullPackage ? 3600 : (this.isScavenged ? 1500 : this.twitchUser ? 1800 : Infinity);
 		let elapsed = curFrame - this.spawnFrame;
 
 		if (elapsed >= maxLife) {
@@ -53,14 +53,21 @@ class AmmoBox extends EngineObject {
 				soundPickup.play(this.pos, 0.7, 1.6);
 			} else if (this.twitchUser || this.isFullPackage) {
 				if (this.isFullPackage) {
-					// D-14, D-20: Slain boss Full Care Package reward (+6 bullets, +3 shells, +2 rifle, +1 heart/shield capped at 4 HP)
-					g_player.ammoBullets += 6;
-					g_player.ammoShells += 3;
-					g_player.ammoRifle += 2;
-					if (g_player.hp < 3) {
-						g_player.hp = Math.min(3, g_player.hp + 1);
+					if (this.twitchUser) {
+						// D-05: Slain audience mini-boss Full Care Package reward
+						g_player.ammoBullets += 4;
+						g_player.ammoShells += 2;
+						g_player.ammoRifle += 1;
 					} else {
-						g_player.hp = Math.min(4, g_player.hp + 1); // Shield pip up to 4 HP max
+						// D-14, D-20, D-21: Slain boss / Gauntlet Care Package reward (+6 bullets, +3 shells, +2 rifle, +1 heart/shield capped at 4 HP)
+						g_player.ammoBullets += 6;
+						g_player.ammoShells += 3;
+						g_player.ammoRifle += 2;
+						if (g_player.hp < 3) {
+							g_player.hp = Math.min(3, g_player.hp + 1);
+						} else {
+							g_player.hp = Math.min(4, g_player.hp + 1); // Shield pip up to 4 HP max
+						}
 					}
 				} else {
 					// D-12, BAL-17: Pure Primary Yields (zero cross-pool bleed)
@@ -98,12 +105,11 @@ class AmmoBox extends EngineObject {
 
 	render() {
 		let curFrame = typeof frame !== "undefined" ? frame : 0;
-		let maxLife = this.isFullPackage ? 3600 : this.isScavenged ? 1500 : this.twitchUser ? 1800 : Infinity;
+		let maxLife = this.isFullPackage ? 3600 : (this.isScavenged ? 1500 : this.twitchUser ? 1800 : Infinity);
 		let remaining = maxLife - (curFrame - this.spawnFrame);
 
 		// D-14, D-15, D-22: Final warning rapid flashing (10 seconds remaining for Full Care Package = 600 frames)
-		let flashThreshold = this.isFullPackage ? 600 : 300;
-		if (remaining <= flashThreshold && Math.floor(curFrame / 4) % 2 === 0) {
+		if ((remaining <= 300 && Math.floor(curFrame / 4) % 2 === 0) || (this.isFullPackage && remaining <= 600 && Math.floor(curFrame / 4) % 2 === 0)) {
 			return;
 		}
 

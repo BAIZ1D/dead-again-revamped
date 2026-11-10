@@ -4476,7 +4476,9 @@ class Enemy extends Mob {
 					let gunTile = g_player && g_player.gun ? g_player.gun.tileIndex : tileNumbers_pistol;
 					// Radial scatter deconfliction (1.5-2.0 tile search) so multiple crates never overlap (D-23)
 					let dropPos = typeof findScatterDropPos === "function" ? findScatterDropPos(this.pos) : this.pos.copy();
-					new AmmoBox(dropPos, gunTile, this.twitchUser || "NightmareBoss", false, true);
+					let crateBox = new AmmoBox(this.pos.copy(), gunTile, this.twitchUser, false, true);
+					if (crateBox && dropPos) crateBox.pos = dropPos;
+					if (crateBox && !this.twitchUser) crateBox.twitchUser = "NightmareBoss";
 					if (typeof g_apgManager !== "undefined" && g_apgManager) {
 						g_apgManager.onEnemyKilled(this);
 					}
@@ -4881,7 +4883,7 @@ class AmmoBox extends EngineObject {
 
 	constructor(pos, gunType, twitchUser = null, isScavenged = false, isFullPackage = false) {
 		// D-19, D-21: Scavenged clips render at 0.75x tile scale, Full Care Packages at 1.25x scale
-		let boxSize = isScavenged ? vec2(0.75) : isFullPackage ? vec2(1.25) : vec2(1);
+		let boxSize = isFullPackage ? vec2(1.25) : (isScavenged ? vec2(0.75) : vec2(1));
 		super(pos, boxSize, getAmmoForGunType(gunType), TILE_SIZE);
 
 		this._hitbox = vec2(0.5);
@@ -4895,7 +4897,7 @@ class AmmoBox extends EngineObject {
 	update() {
 		let curFrame = typeof frame !== "undefined" ? frame : 0;
 		// Full Care Packages persist for 60 seconds (3600 frames) per D-22
-		let maxLife = this.isFullPackage ? 3600 : this.isScavenged ? 1500 : this.twitchUser ? 1800 : Infinity;
+		let maxLife = this.isFullPackage ? 3600 : (this.isScavenged ? 1500 : this.twitchUser ? 1800 : Infinity);
 		let elapsed = curFrame - this.spawnFrame;
 
 		if (elapsed >= maxLife) {
@@ -4922,14 +4924,21 @@ class AmmoBox extends EngineObject {
 				soundPickup.play(this.pos, 0.7, 1.6);
 			} else if (this.twitchUser || this.isFullPackage) {
 				if (this.isFullPackage) {
-					// D-14, D-20: Slain boss Full Care Package reward (+6 bullets, +3 shells, +2 rifle, +1 heart/shield capped at 4 HP)
-					g_player.ammoBullets += 6;
-					g_player.ammoShells += 3;
-					g_player.ammoRifle += 2;
-					if (g_player.hp < 3) {
-						g_player.hp = Math.min(3, g_player.hp + 1);
+					if (this.twitchUser) {
+						// D-05: Slain audience mini-boss Full Care Package reward
+						g_player.ammoBullets += 4;
+						g_player.ammoShells += 2;
+						g_player.ammoRifle += 1;
 					} else {
-						g_player.hp = Math.min(4, g_player.hp + 1); // Shield pip up to 4 HP max
+						// D-14, D-20, D-21: Slain boss / Gauntlet Care Package reward (+6 bullets, +3 shells, +2 rifle, +1 heart/shield capped at 4 HP)
+						g_player.ammoBullets += 6;
+						g_player.ammoShells += 3;
+						g_player.ammoRifle += 2;
+						if (g_player.hp < 3) {
+							g_player.hp = Math.min(3, g_player.hp + 1);
+						} else {
+							g_player.hp = Math.min(4, g_player.hp + 1); // Shield pip up to 4 HP max
+						}
 					}
 				} else {
 					// D-12, BAL-17: Pure Primary Yields (zero cross-pool bleed)
@@ -4967,12 +4976,11 @@ class AmmoBox extends EngineObject {
 
 	render() {
 		let curFrame = typeof frame !== "undefined" ? frame : 0;
-		let maxLife = this.isFullPackage ? 3600 : this.isScavenged ? 1500 : this.twitchUser ? 1800 : Infinity;
+		let maxLife = this.isFullPackage ? 3600 : (this.isScavenged ? 1500 : this.twitchUser ? 1800 : Infinity);
 		let remaining = maxLife - (curFrame - this.spawnFrame);
 
 		// D-14, D-15, D-22: Final warning rapid flashing (10 seconds remaining for Full Care Package = 600 frames)
-		let flashThreshold = this.isFullPackage ? 600 : 300;
-		if (remaining <= flashThreshold && Math.floor(curFrame / 4) % 2 === 0) {
+		if ((remaining <= 300 && Math.floor(curFrame / 4) % 2 === 0) || (this.isFullPackage && remaining <= 600 && Math.floor(curFrame / 4) % 2 === 0)) {
 			return;
 		}
 
@@ -8069,7 +8077,7 @@ function renderStartScreenBadges(cx, H, u, safeW) {
     // 3. Symmetrical Dual Buttons: "[H] HOW TO PLAY & GUIDE" and "[C] CREDITS" at H * 0.83 (D-01, D-05)
     const rowY = H * 0.83;
     const btnW = Math.min(safeW * 0.38, u * 11);
-    const btnH = Math.min(u * 1.6, H * 0.044);
+    const btnH = Math.min(u * 1.3, H * 0.035);
     const gap = Math.max(8, u * 0.8);
     const guideX = cx - btnW / 2 - gap / 2;
     const creditsX = cx + btnW / 2 + gap / 2;
@@ -8105,9 +8113,9 @@ function renderStartScreenBadges(cx, H, u, safeW) {
     drawTextWithOutline("[C] CREDITS", vec2(creditsX, rowY), Math.max(11, u * 0.58), colorSpark);
 
     // 3b. Application Exit Button: "[ EXIT GAME ]" (D-25, D-26)
-    const exitY = H * 0.88;
+    const exitY = H * 0.885;
     const exitW = Math.min(safeW * 0.42, u * 12);
-    const exitH = Math.min(u * 1.4, H * 0.042);
+    const exitH = Math.min(u * 1.3, H * 0.035);
     const exitGlowAlpha = g_startHoverExit ? 0.85 : 0.45;
 
     overlayContext.save();
@@ -8127,7 +8135,7 @@ function renderStartScreenBadges(cx, H, u, safeW) {
     const isMac = typeof navigator !== 'undefined' && (/Mac|iPhone|iPod|iPad/i.test(navigator.platform || '') || /Macintosh|Mac OS X/i.test(navigator.userAgent || ''));
     const keyHint = isMac ? "⌘+D" : "Ctrl+D";
     const dashText = `Press ${keyHint} to Open Streamer Dashboard`;
-    const dashY = H * 0.93;
+    const dashY = H * 0.935;
     drawTextWithOutline(dashText, vec2(cx, dashY), Math.max(11, u * 0.55), new Color(0.78, 0.65, 1.0, 0.95), colorBlack);
 
     overlayContext.restore();
@@ -9008,14 +9016,14 @@ function updateStartScreen() {
 
     const rowY = H * 0.83;
     const btnW = Math.min(safeW * 0.38, u * 11);
-    const btnH = Math.min(u * 1.6, H * 0.044);
+    const btnH = Math.min(u * 1.3, H * 0.035);
     const gap = Math.max(8, u * 0.8);
     const guideX = cx - btnW / 2 - gap / 2;
     const creditsX = cx + btnW / 2 + gap / 2;
 
-    const exitY = H * 0.88;
+    const exitY = H * 0.885;
     const exitW = Math.min(safeW * 0.42, u * 12);
-    const exitH = Math.min(u * 1.4, H * 0.042);
+    const exitH = Math.min(u * 1.3, H * 0.035);
 
     if (g_startMoonPulseFrames > 0) {
         g_startMoonPulseFrames--;
@@ -9025,8 +9033,8 @@ function updateStartScreen() {
     const { moonX, moonY, moonR } = getStartMoonMetrics(W, H, u, safeW, safeH);
     if (mPos) {
         g_startHoverCTA = Math.abs(mPos.x - cx) < ctaW / 2 && Math.abs(mPos.y - ctaY) < ctaH / 2;
-        g_startHoverGuide = Math.abs(mPos.x - guideX) < btnW / 2 && Math.abs(mPos.y - rowY) < btnH / 2;
-        g_startHoverCredits = Math.abs(mPos.x - creditsX) < btnW / 2 && Math.abs(mPos.y - rowY) < btnH / 2;
+        g_startHoverGuide = ((mPos.x <= cx && Math.abs(mPos.x - guideX) <= btnW / 2 + gap / 2 && Math.abs(mPos.y - rowY) <= btnH / 2) || (Math.abs(mPos.x - guideX) <= btnW / 2 && Math.abs(mPos.y - rowY) <= btnH / 2));
+        g_startHoverCredits = (mPos.x > cx && Math.abs(mPos.x - creditsX) <= btnW / 2 && Math.abs(mPos.y - rowY) <= btnH / 2);
         g_startHoverExit = Math.abs(mPos.x - cx) < exitW / 2 && Math.abs(mPos.y - exitY) < exitH / 2;
         const hoverMoon = Math.hypot(mPos.x - moonX, mPos.y - moonY) <= moonR * 1.35;
         if (mainCanvas && mainCanvas.style) {
@@ -9064,14 +9072,14 @@ function updateStartScreen() {
             return;
         }
         // Clicked Guide Button
-        if (Math.abs(mPos.x - guideX) < btnW / 2 && Math.abs(mPos.y - rowY) < btnH / 2) {
+        if ((mPos.x <= cx && Math.abs(mPos.x - guideX) <= btnW / 2 + gap / 2 && Math.abs(mPos.y - rowY) <= btnH / 2) || (Math.abs(mPos.x - guideX) <= btnW / 2 && Math.abs(mPos.y - rowY) <= btnH / 2)) {
             g_startHelpOpen = true;
             g_startModalSpringFrames = 4;
             playStartTabChirp(g_startHelpTab);
             return;
         }
         // Clicked Credits Button
-        if (Math.abs(mPos.x - creditsX) < btnW / 2 && Math.abs(mPos.y - rowY) < btnH / 2) {
+        if (mPos.x > cx && Math.abs(mPos.x - creditsX) <= btnW / 2 && Math.abs(mPos.y - rowY) <= btnH / 2) {
             g_startCreditsOpen = true;
             playStartTabChirp(0);
             return;

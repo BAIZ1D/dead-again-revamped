@@ -1245,7 +1245,7 @@ function renderStartScreenBadges(cx, H, u, safeW) {
     // 3. Symmetrical Dual Buttons: "[H] HOW TO PLAY & GUIDE" and "[C] CREDITS" at H * 0.83 (D-01, D-05)
     const rowY = H * 0.83;
     const btnW = Math.min(safeW * 0.38, u * 11);
-    const btnH = Math.min(u * 1.6, H * 0.044);
+    const btnH = Math.min(u * 1.3, H * 0.035);
     const gap = Math.max(8, u * 0.8);
     const guideX = cx - btnW / 2 - gap / 2;
     const creditsX = cx + btnW / 2 + gap / 2;
@@ -1281,9 +1281,9 @@ function renderStartScreenBadges(cx, H, u, safeW) {
     drawTextWithOutline("[C] CREDITS", vec2(creditsX, rowY), Math.max(11, u * 0.58), colorSpark);
 
     // 3b. Application Exit Button: "[ EXIT GAME ]" (D-25, D-26)
-    const exitY = H * 0.88;
+    const exitY = H * 0.885;
     const exitW = Math.min(safeW * 0.42, u * 12);
-    const exitH = Math.min(u * 1.4, H * 0.042);
+    const exitH = Math.min(u * 1.3, H * 0.035);
     const exitGlowAlpha = g_startHoverExit ? 0.85 : 0.45;
 
     overlayContext.save();
@@ -1303,7 +1303,7 @@ function renderStartScreenBadges(cx, H, u, safeW) {
     const isMac = typeof navigator !== 'undefined' && (/Mac|iPhone|iPod|iPad/i.test(navigator.platform || '') || /Macintosh|Mac OS X/i.test(navigator.userAgent || ''));
     const keyHint = isMac ? "⌘+D" : "Ctrl+D";
     const dashText = `Press ${keyHint} to Open Streamer Dashboard`;
-    const dashY = H * 0.93;
+    const dashY = H * 0.935;
     drawTextWithOutline(dashText, vec2(cx, dashY), Math.max(11, u * 0.55), new Color(0.78, 0.65, 1.0, 0.95), colorBlack);
 
     overlayContext.restore();
@@ -2184,14 +2184,14 @@ function updateStartScreen() {
 
     const rowY = H * 0.83;
     const btnW = Math.min(safeW * 0.38, u * 11);
-    const btnH = Math.min(u * 1.6, H * 0.044);
+    const btnH = Math.min(u * 1.3, H * 0.035);
     const gap = Math.max(8, u * 0.8);
     const guideX = cx - btnW / 2 - gap / 2;
     const creditsX = cx + btnW / 2 + gap / 2;
 
-    const exitY = H * 0.88;
+    const exitY = H * 0.885;
     const exitW = Math.min(safeW * 0.42, u * 12);
-    const exitH = Math.min(u * 1.4, H * 0.042);
+    const exitH = Math.min(u * 1.3, H * 0.035);
 
     if (g_startMoonPulseFrames > 0) {
         g_startMoonPulseFrames--;
@@ -2201,8 +2201,8 @@ function updateStartScreen() {
     const { moonX, moonY, moonR } = getStartMoonMetrics(W, H, u, safeW, safeH);
     if (mPos) {
         g_startHoverCTA = Math.abs(mPos.x - cx) < ctaW / 2 && Math.abs(mPos.y - ctaY) < ctaH / 2;
-        g_startHoverGuide = Math.abs(mPos.x - guideX) < btnW / 2 && Math.abs(mPos.y - rowY) < btnH / 2;
-        g_startHoverCredits = Math.abs(mPos.x - creditsX) < btnW / 2 && Math.abs(mPos.y - rowY) < btnH / 2;
+        g_startHoverGuide = ((mPos.x <= cx && Math.abs(mPos.x - guideX) <= btnW / 2 + gap / 2 && Math.abs(mPos.y - rowY) <= btnH / 2) || (Math.abs(mPos.x - guideX) <= btnW / 2 && Math.abs(mPos.y - rowY) <= btnH / 2));
+        g_startHoverCredits = (mPos.x > cx && Math.abs(mPos.x - creditsX) <= btnW / 2 && Math.abs(mPos.y - rowY) <= btnH / 2);
         g_startHoverExit = Math.abs(mPos.x - cx) < exitW / 2 && Math.abs(mPos.y - exitY) < exitH / 2;
         const hoverMoon = Math.hypot(mPos.x - moonX, mPos.y - moonY) <= moonR * 1.35;
         if (mainCanvas && mainCanvas.style) {
@@ -2240,14 +2240,14 @@ function updateStartScreen() {
             return;
         }
         // Clicked Guide Button
-        if (Math.abs(mPos.x - guideX) < btnW / 2 && Math.abs(mPos.y - rowY) < btnH / 2) {
+        if ((mPos.x <= cx && Math.abs(mPos.x - guideX) <= btnW / 2 + gap / 2 && Math.abs(mPos.y - rowY) <= btnH / 2) || (Math.abs(mPos.x - guideX) <= btnW / 2 && Math.abs(mPos.y - rowY) <= btnH / 2)) {
             g_startHelpOpen = true;
             g_startModalSpringFrames = 4;
             playStartTabChirp(g_startHelpTab);
             return;
         }
         // Clicked Credits Button
-        if (Math.abs(mPos.x - creditsX) < btnW / 2 && Math.abs(mPos.y - rowY) < btnH / 2) {
+        if (mPos.x > cx && Math.abs(mPos.x - creditsX) <= btnW / 2 && Math.abs(mPos.y - rowY) <= btnH / 2) {
             g_startCreditsOpen = true;
             playStartTabChirp(0);
             return;
