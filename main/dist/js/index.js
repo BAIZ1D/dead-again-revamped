@@ -6212,39 +6212,38 @@ function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxHeight) {
     };
 }
 
-// Tab 1: Weapon Stat Cards & Health Telemetry (CLIP-06, D-07)
+// Tab 1: Weapon Stat Cards & Health Telemetry (CLIP-06, HELP-01, D-03, D-04)
 function renderHelpTabWeapons(x, y, w, h, u) {
+    overlayContext.textAlign = 'left';
+    overlayContext.textBaseline = 'alphabetic';
+
     const cardW = (w - u * 0.8) / 2;
-    const cardH = (h - u * 1.8) / 2;
+    const cardH = (h - u * 2.8) / 2;
 
     const weapons = [
         {
             name: "SERVICE PISTOL",
             tile: tileNumbers_pistol,
-            mag: "6 Rounds (Single Row)",
-            cap: "36 Bullets Reserve",
-            desc: "Balanced sidearm. Precision semi-auto fire with crisp trigger reset."
+            statLine: "MAG: 6-Shot Cylinder | CAP: 36 Bullets | RELOAD: 0.18s/rd",
+            desc: "Reliable starting sidearm (0.4 velocity, 28f range). Snappy per-bullet cylinder reload (1.08s full) and pinpoint semi-auto reset for kiting early Walker waves."
         },
         {
             name: "MACHINE PISTOL (SMG)",
             tile: tileNumbers_smg,
-            mag: "20 Rounds (2x10 Grid)",
-            cap: "36 Bullets Reserve",
-            desc: "Rapid spray (12.5 rps) with hold bloom; tap burst for pinpoint accuracy."
+            statLine: "MAG: 20 Rounds (2x10 Grid) | CAP: 36 Bullets | RATE: 80ms",
+            desc: "Fast 0.02s/rd reload (0.40s full). Shots 1–3 hold laser precision (≤0.02 rad) with 160ms tap reset; continuous hold (shots 4–20) expands bloom to ±0.48 rad (27.5°) with ±8% velocity jitter."
         },
         {
             name: "COMBAT SHOTGUN",
             tile: tileNumbers_shotgun,
-            mag: "2 Heavy Shells",
-            cap: "8 Shells Reserve",
-            desc: "High close-range lethality with wide pellet spread. Scarcity-tuned."
+            statLine: "MAG: 2 Shells (Break-Action) | CAP: 8 Shells | RELOAD: 0.60s/sh",
+            desc: "Fires 4 heavy pellets across a 30° (π/6) spread cone (0.3 velocity, 22f range). High close-quarters stopping power; scarcity-gated in Levels 1–2 (0% upgrade roll; 10% roll in L3+)."
         },
         {
             name: "HUNTING RIFLE",
             tile: tileNumbers_rifle,
-            mag: "4 Rounds",
-            cap: "8 Rounds Reserve",
-            desc: "Piercing long-range stopping power. Heavy knockdown against bosses."
+            statLine: "MAG: 1 Round (Bolt-Action) | CAP: 8 Rounds | RELOAD: 2.0s",
+            desc: "High-velocity (0.5 speed, 40f range) armor-piercing slug (12 penetration) that punches through entire mob lines and deals heavy stagger to Bosses."
         }
     ];
 
@@ -6252,7 +6251,7 @@ function renderHelpTabWeapons(x, y, w, h, u) {
         const col = i % 2;
         const row = Math.floor(i / 2);
         const cx = x + col * (cardW + u * 0.8);
-        const cy = y + row * (cardH + u * 0.6);
+        const cy = y + row * (cardH + u * 0.4);
         const wep = weapons[i];
 
         overlayContext.fillStyle = 'rgba(22, 27, 34, 0.75)';
@@ -6261,29 +6260,41 @@ function renderHelpTabWeapons(x, y, w, h, u) {
         overlayContext.strokeRect(cx, cy, cardW, cardH);
 
         // Weapon Tile
-        drawOverlayTile(wep.tile, cx + u * 1.5, cy + cardH * 0.35, u * 2.8, 0, false, 1.0);
+        overlayContext.save();
+        drawOverlayTile(wep.tile, cx + u * 1.5, cy + cardH * 0.35, u * 2.6, 0, false, 1.0);
+        overlayContext.restore();
 
         // Weapon Title & Details
-        overlayContext.font = `bold ${Math.max(11, u * 0.62)}px ${fontDefault}`;
-        overlayContext.textAlign = 'left';
+        overlayContext.font = `bold ${Math.max(11, u * 0.58)}px ${fontDefault}`;
         overlayContext.fillStyle = '#FBF236';
-        overlayContext.fillText(wep.name, cx + u * 3.4, cy + u * 0.8);
+        overlayContext.fillText(wep.name, cx + u * 3.3, cy + u * 0.75);
 
-        overlayContext.font = `bold ${Math.max(9, u * 0.46)}px ${fontDefault}`;
+        // Stat Line
+        overlayContext.font = `bold ${Math.max(8.5, u * 0.42)}px ${fontDefault}`;
         overlayContext.fillStyle = '#D4AF37';
-        overlayContext.fillText(`MAG: ${wep.mag} | CAP: ${wep.cap}`, cx + u * 3.4, cy + u * 1.6);
+        overlayContext.fillText(wep.statLine, cx + u * 3.3, cy + u * 1.45);
 
-        overlayContext.font = `${Math.max(9, u * 0.44)}px ${fontDefault}`;
+        // Description
+        overlayContext.font = `${Math.max(8.5, u * 0.42)}px ${fontDefault}`;
         overlayContext.fillStyle = '#C8D1DC';
-        drawWrappedText(overlayContext, wep.desc, cx + u * 0.8, cy + u * 2.3, cardW - u * 1.2, u * 0.52, cardH - u * 2.6);
+        drawWrappedText(overlayContext, wep.desc, cx + u * 0.7, cy + u * 2.05, cardW - u * 1.4, Math.max(9.5, u * 0.44), cardH - u * 2.3);
     }
 
-    // Health Telemetry Footer
-    const footY = y + cardH * 2 + u * 0.9;
-    overlayContext.font = `bold ${Math.max(10, u * 0.52)}px ${fontDefault}`;
-    overlayContext.textAlign = 'left';
+    // Health, Supply & Stage Carryover Footer Strip
+    const footY = y + cardH * 2 + u * 0.6;
+    const footH = h - (footY - y);
+    overlayContext.fillStyle = 'rgba(22, 27, 34, 0.75)';
+    overlayContext.fillRect(x, footY, w, footH);
+    overlayContext.strokeStyle = 'rgba(212, 175, 55, 0.30)';
+    overlayContext.strokeRect(x, footY, w, footH);
+
+    overlayContext.font = `bold ${Math.max(9.5, u * 0.46)}px ${fontDefault}`;
     overlayContext.fillStyle = '#FF4D4D';
-    drawWrappedText(overlayContext, "HEALTH & SURVIVAL: 3 Base Hearts + 1 Golden Shield Pip. 1 HP triggers critical danger pulse.", x + u * 0.5, footY, w - u * 1.0, u * 0.52);
+    overlayContext.fillText("HEALTH, SUPPLY & LEVEL CARRYOVER", x + u * 0.6, footY + u * 0.55);
+
+    overlayContext.font = `${Math.max(8.5, u * 0.40)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#C8D1DC';
+    drawWrappedText(overlayContext, "3 Base Hearts + 1 Golden Shield Pip (!repair, 4 HP cap). 0.75s (45f) post-hit grace with radial knockback pusher; 1 HP triggers heartbeat alarm. Map Supply Crates yield +8B / +3S / +2R. Floor weapon swap refunds chamber ammo. Next stage starting reserves clamp to 18 Bullets / 4 Shells / 3 Rifle.", x + u * 0.6, footY + u * 0.95, w - u * 1.2, Math.max(9.5, u * 0.42), footH - u * 0.9);
 }
 
 // Tab 2: Twitch APG Karma, Commands & Mob Threat Cards (CLIP-06, D-07)
@@ -6456,8 +6467,8 @@ function renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH) {
     const tabW = (modalW - u * 2.0) / 3;
     const tabTitles = [
         "1. COMBAT & WEAPONS",
-        "2. TWITCH APG & KARMA",
-        "3. STREAMER SETUP"
+        "2. BESTIARY & THREATS",
+        "3. TWITCH APG & STREAM"
     ];
 
     for (let i = 0; i < 3; i++) {
