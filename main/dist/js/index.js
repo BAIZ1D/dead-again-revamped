@@ -6676,9 +6676,11 @@ function renderLobbyHUD() {
 	uiDrawRectScreen(vec2(cx, H * 0.52), vec2(cardW + 4, cardH + 4), colorWhite.scale(0.25));
 	uiDrawRectScreen(vec2(cx, H * 0.52), vec2(cardW, cardH), new Color(0.05, 0.05, 0.07, 0.86));
 
-	// 2. Flickering Blood-Red Header (D-21, D-22)
+	// 2. Flickering Blood-Red Header (D-21, D-22, CLIP-05)
 	const headerText = "LEVEL " + (g_level + 1) + ": WILL CHAT BE GOOD OR BAD?";
-	const headerSize = Math.min(u * 1.45, W / 24);
+	const baseHeaderSize = Math.min(u * 1.45, W / 24);
+	const headerFontScale = Math.min(1.0, (cardW - u * 1.6) / Math.max(1, headerText.length * (baseHeaderSize * 0.60)));
+	const headerSize = baseHeaderSize * headerFontScale;
 	let flicker = (1.5 + Math.sin(frame / 50)) * 0.005;
 	for (let i = 0; i < 10; i++) {
 		drawTextScreen(
@@ -6697,16 +6699,21 @@ function renderLobbyHUD() {
 		: "● LIVE CHAT POLL — TYPE !good OR !bad IN CHAT";
 	drawTextWithOutline(modeText, vec2(cx, H * 0.24), u * 0.78, isHelix ? colorSpark : colorBullet);
 
-	// 4. Large Countdown Timer or 2-Second Lock Splash (PRED-02, D-06, D-22)
+	// 4. Large Countdown Timer or 2-Second Lock Splash (PRED-02, D-06, D-22, CLIP-05, D-03)
 	const goodPct = clamp(typeof pred.goodPct === "number" ? pred.goodPct : 50, 0, 100);
 	const badPct = 100 - goodPct;
 
 	if (pred.status === "LOCKED") {
-		const bannerW = Math.min(W * 0.72, u * 26);
+		const lockText = "VOTES LOCKED: " + goodPct + "% GOOD vs " + badPct + "% BAD";
+		const baseLockSize = u * 1.35;
+		const measuredW = overlayContext && overlayContext.measureText ? overlayContext.measureText(lockText).width : 0;
+		const textW = Math.max(measuredW, lockText.length * baseLockSize * 0.60);
+		const maxBannerW = Math.min(W * 0.88, cardW - u * 1.2);
+		const bannerW = Math.min(maxBannerW, Math.max(u * 26, textW + u * 2.4));
+		const fontScale = Math.min(1.0, (bannerW - u * 1.6) / Math.max(1, textW));
 		uiDrawRectScreen(vec2(cx, H * 0.34), vec2(bannerW + 4, u * 2.4 + 4), colorSpark);
 		uiDrawRectScreen(vec2(cx, H * 0.34), vec2(bannerW, u * 2.4), new Color(0.15, 0.05, 0.05, 0.95));
-		const lockText = "VOTES LOCKED: " + goodPct + "% GOOD vs " + badPct + "% BAD";
-		drawTextWithOutline(lockText, vec2(cx, H * 0.34), u * 1.35, colorSpark);
+		drawTextWithOutline(lockText, vec2(cx, H * 0.34), baseLockSize * fontScale, colorSpark);
 	} else {
 		const rem = Math.max(0, Math.ceil(Number(pred.remainingSeconds) || 0));
 		const mins = Math.floor(rem / 60);
@@ -6749,7 +6756,7 @@ function renderLobbyHUD() {
 	drawTextWithOutline(goodLabel, vec2(cx - barW * 0.24, barY), u * 0.78, colorWhite);
 	drawTextWithOutline(badLabel, vec2(cx + barW * 0.24, barY), u * 0.78, colorWhite);
 
-	// 6. Dual Team Roster Columns (D-22)
+	// 6. Dual Team Roster Columns (D-22, CLIP-05, D-04)
 	const colW = barW * 0.46;
 	const colH = H * 0.19;
 	const colY = H * 0.65;
@@ -6769,7 +6776,9 @@ function renderLobbyHUD() {
 		drawTextWithOutline("Waiting for !good votes...", vec2(leftColX, H * 0.64), u * 0.66, colorGrey);
 	} else {
 		for (let i = 0; i < goodVoters.length; i++) {
-			drawTextWithOutline("+ @" + goodVoters[i], vec2(leftColX, H * 0.62 + i * (u * 0.85)), u * 0.68, colorWhite);
+			const voterName = goodVoters[i];
+			const voterFontScale = Math.min(1.0, (colW - u * 0.6) / Math.max(1, ("+ @" + voterName).length * (u * 0.68 * 0.60)));
+			drawTextWithOutline("+ @" + voterName, vec2(leftColX, H * 0.62 + i * (u * 0.85)), u * 0.68 * voterFontScale, colorWhite);
 		}
 	}
 
@@ -6777,17 +6786,21 @@ function renderLobbyHUD() {
 		drawTextWithOutline("Waiting for !bad votes...", vec2(rightColX, H * 0.64), u * 0.66, colorGrey);
 	} else {
 		for (let i = 0; i < badVoters.length; i++) {
-			drawTextWithOutline("+ @" + badVoters[i], vec2(rightColX, H * 0.62 + i * (u * 0.85)), u * 0.68, colorWhite);
+			const voterName = badVoters[i];
+			const voterFontScale = Math.min(1.0, (colW - u * 0.6) / Math.max(1, ("+ @" + voterName).length * (u * 0.68 * 0.60)));
+			drawTextWithOutline("+ @" + voterName, vec2(rightColX, H * 0.62 + i * (u * 0.85)), u * 0.68 * voterFontScale, colorWhite);
 		}
 	}
 
-	// 7. Bottom Command Cheat-Sheet & Quick-Lock Prompt (D-04, D-22)
+	// 7. Bottom Command Cheat-Sheet & Quick-Lock Prompt (D-04, D-22, CLIP-05)
 	const cheatText = "GOOD: !ammo !repair !light !slow !barrier   |   BAD: !mob !boss !blackout !jam !frenzy";
-	drawTextWithOutline(cheatText, vec2(cx, H * 0.82), u * 0.7, colorBullet);
+	const cheatFontScale = Math.min(1.0, (cardW - u * 1.6) / Math.max(1, cheatText.length * (u * 0.70 * 0.60)));
+	drawTextWithOutline(cheatText, vec2(cx, H * 0.82), u * 0.70 * cheatFontScale, colorBullet);
 
 	const promptAlpha = 0.82 + 0.18 * Math.sin(frame / 12);
 	const promptText = "Chat: !good or !bad   |   Streamer: [SPACE] or [RIGHT-CLICK] Lock Votes & Start Now";
-	drawTextWithOutline(promptText, vec2(cx, H * 0.88), u * 0.78, colorSpark.scale(promptAlpha));
+	const promptFontScale = Math.min(1.0, (cardW - u * 1.6) / Math.max(1, promptText.length * (u * 0.78 * 0.60)));
+	drawTextWithOutline(promptText, vec2(cx, H * 0.88), u * 0.78 * promptFontScale, colorSpark.scale(promptAlpha));
 }
 
 function renderOutcomeHUD(inW, inH, inCx, inU) {
