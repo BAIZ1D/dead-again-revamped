@@ -1876,6 +1876,7 @@ function updateStartScreen() {
     if (g_startHelpOpen) {
         g_startHoverCTA = false;
         g_startHoverGuide = false;
+        g_startHoverExit = false;
         if (mainCanvas && mainCanvas.style) mainCanvas.style.cursor = 'default';
 
         // Field Manual Modal Input Routing (CLIP-06, D-06: synchronized HiDPI bounds)
