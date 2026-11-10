@@ -892,6 +892,16 @@
     });
   }
 
+  const itchHeaderBtn = document.getElementById('itch-header-btn');
+  if (itchHeaderBtn) {
+    itchHeaderBtn.addEventListener('click', (e) => {
+      if (window.electronAPI && typeof window.electronAPI.openExternalUrl === 'function') {
+        e.preventDefault();
+        openExternal('https://baiz1d.itch.io/dead-again-revamped');
+      }
+    });
+  }
+
   const kofiHeaderBtn = document.getElementById('kofi-header-btn');
   if (kofiHeaderBtn) {
     kofiHeaderBtn.addEventListener('click', (e) => {
