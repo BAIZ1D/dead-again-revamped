@@ -137,7 +137,72 @@ var g_lobbyLockBannerTimer = 0;
 var g_lobbyLastBeepSecond = -1;
 var g_lobbyTransitioning = false;
 
+function performWaveMicroPurge() {
+	// Prune corpses exceeding 30s (1800 frames) or pool exceeding 60 items (D-19)
+	if (typeof g_corpses !== "undefined" && Array.isArray(g_corpses)) {
+		let maxAgeFrames = 30 * (typeof fps !== "undefined" && fps > 0 ? fps : 60);
+		for (let i = g_corpses.length - 1; i >= 0; i--) {
+			let corpse = g_corpses[i];
+			if (corpse && (corpse.timeAlive > maxAgeFrames || g_corpses.length > 60)) {
+				if (corpse.bloodEmitter && typeof corpse.bloodEmitter.destroy === "function") {
+					corpse.bloodEmitter.destroy();
+				}
+				if (typeof corpse.destroy === "function") {
+					corpse.destroy();
+				}
+				g_corpses.splice(i, 1);
+			}
+		}
+		while (g_corpses.length > 60) {
+			let old = g_corpses.shift();
+			if (old) {
+				if (old.bloodEmitter && typeof old.bloodEmitter.destroy === "function") {
+					old.bloodEmitter.destroy();
+				}
+				if (typeof old.destroy === "function") {
+					old.destroy();
+				}
+			}
+		}
+	}
+
+	// Prune splatters exceeding 60 count (D-19)
+	if (typeof g_splatter !== "undefined" && Array.isArray(g_splatter)) {
+		if (g_splatter.length > 60) {
+			g_splatter.splice(0, g_splatter.length - 60);
+		}
+	}
+
+	// Prune dynamic shadows beyond 20 tiles of player (D-19)
+	if (typeof g_shadows !== "undefined" && g_shadows && typeof g_player !== "undefined" && g_player && g_player.pos) {
+		for (let key in g_shadows) {
+			let sh = g_shadows[key];
+			if (sh && typeof sh.x === "number" && typeof sh.y === "number") {
+				let d = vec2(sh.x, sh.y).distance(g_player.pos);
+				if (d > 20) {
+					delete g_shadows[key];
+				}
+			}
+		}
+	}
+
+	// Reset expired or stray particle emitters in engineObjects (D-19)
+	if (typeof engineObjects !== "undefined" && Array.isArray(engineObjects)) {
+		for (let i = engineObjects.length - 1; i >= 0; i--) {
+			let obj = engineObjects[i];
+			if (obj && typeof ParticleEmitter !== "undefined" && obj instanceof ParticleEmitter) {
+				if (obj.emitTime === 0 || (obj.emitTimer && typeof obj.emitTimer.isSet === "function" && obj.emitTimer.isSet() && obj.emitTimer.elapsed() > 30)) {
+					if (typeof obj.destroy === "function") {
+						obj.destroy();
+					}
+				}
+			}
+		}
+	}
+}
+
 function enterLobbyState() {
+	performWaveMicroPurge();
 	if (g_player) {
 		g_savedEquipment = {
 			ammoPistol: Math.min(g_player.ammoBullets, LEVEL_TRANSITION_MAX_BULLETS),
@@ -672,6 +737,9 @@ function changeState(newState) {
 	textsClear();
 	stateChangedTime = new Date().getTime();
 	g_state = newState;
+	if (newState === STATE_DEAD && typeof soundDefeatCrash !== "undefined") {
+		soundDefeatCrash.play();
+	}
 	if ((newState === STATE_DEAD || newState === STATE_CLEARED) && typeof g_apgManager !== "undefined" && g_apgManager) {
 		g_apgManager.onMatchOrLevelEnd(newState);
 	}
@@ -699,6 +767,9 @@ var ammoCooldownFrames = 0;
 var levelCleared = false;
 
 function updateStatePlaying() {
+	if (typeof updateMusicDynamicScaling === "function") {
+		updateMusicDynamicScaling();
+	}
 	// game gets more difficult as you play
 	g_difficulty = 1 + ((g_level / levelDefs.length) | 0);
 
@@ -777,6 +848,10 @@ function updateStatePlaying() {
 				};
 				if (typeof soundOutcomeGood !== "undefined") soundOutcomeGood.play();
 			}
+			if (typeof soundWaveSurvival !== "undefined") {
+				soundWaveSurvival.play();
+			}
+			performWaveMicroPurge();
 		}
 
 		changeState(STATE_CLEARED);
@@ -832,8 +907,28 @@ function updateStatePlaying() {
 				.normalize(TILES_PER_SCREEN - 7)
 		);
 	}
-	// camera goes halfway between player and mouse
-	cameraPos = cameraPos.lerp(g_player.pos.add(newPoint.subtract(g_player.pos).scale(0.5)), 0.03);
+	// camera goes halfway between player and mouse, clamped so player never drifts closer than 4.5 tiles to screen edge (D-65)
+	let targetPos = g_player.pos.add(newPoint.subtract(g_player.pos).scale(0.5));
+	let halfW = (typeof mainCanvas !== "undefined" && typeof cameraScale !== "undefined" && cameraScale > 0) ? (mainCanvas.width / cameraScale) / 2 : 6.5;
+	let halfH = (typeof mainCanvas !== "undefined" && typeof cameraScale !== "undefined" && cameraScale > 0) ? (mainCanvas.height / cameraScale) / 2 : 6.5;
+	let maxLeadX = Math.max(0, halfW - 4.5);
+	let maxLeadY = Math.max(0, halfH - 4.5);
+	targetPos.x = clamp(targetPos.x, g_player.pos.x - maxLeadX, g_player.pos.x + maxLeadX);
+	targetPos.y = clamp(targetPos.y, g_player.pos.y - maxLeadY, g_player.pos.y + maxLeadY);
+
+	if (typeof tileCollisionSize !== "undefined" && tileCollisionSize && tileCollisionSize.x > 0 && tileCollisionSize.y > 0) {
+		if (tileCollisionSize.x >= 2 * halfW) {
+			targetPos.x = clamp(targetPos.x, halfW, tileCollisionSize.x - halfW);
+		} else {
+			targetPos.x = tileCollisionSize.x / 2;
+		}
+		if (tileCollisionSize.y >= 2 * halfH) {
+			targetPos.y = clamp(targetPos.y, halfH, tileCollisionSize.y - halfH);
+		} else {
+			targetPos.y = tileCollisionSize.y / 2;
+		}
+	}
+	cameraPos = cameraPos.lerp(targetPos, 0.03);
 
 	fx_updateScreenShake();
 

@@ -14,13 +14,16 @@ function fx_addSpark (pos) {
 }
 
 function fx_shakeScreen (amt) {
+	amt = Math.min(0.35, Math.max(0, amt));
 	g_screenShake = vec2(rand(-amt, amt), rand(-amt, amt));
 }
 
 function fx_updateScreenShake () {
 
-	if (g_screenShake.length() > 0.01) {
-		g_screenShake = g_screenShake.multiply(vec2(-0.7));
+	if (g_screenShake && g_screenShake.length() > 0.01) {
+		g_screenShake = g_screenShake.multiply(vec2(-0.6));
+	} else if (g_screenShake) {
+		g_screenShake = vec2(0, 0);
 	}
 
 }

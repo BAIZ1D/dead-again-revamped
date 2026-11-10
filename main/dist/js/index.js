@@ -20,6 +20,38 @@ function safeSetPref(key, value) {
 	} catch (e) {}
 }
 
+function getNightmareBestWave() {
+	let val = parseInt(safeGetPref('da_nightmare_best_wave', '0'), 10);
+	if (isNaN(val) || val < 0) {
+		safeSetPref('da_nightmare_best_wave', '0');
+		return 0;
+	}
+	return val;
+}
+
+function getNightmareBestTime() {
+	let val = parseInt(safeGetPref('da_nightmare_best_time', '0'), 10);
+	if (isNaN(val) || val < 0) {
+		safeSetPref('da_nightmare_best_time', '0');
+		return 0;
+	}
+	return val;
+}
+
+function setNightmareBestWave(w) {
+	safeSetPref('da_nightmare_best_wave', Math.max(0, parseInt(w, 10) || 0));
+}
+
+function setNightmareBestTime(t) {
+	safeSetPref('da_nightmare_best_time', Math.max(0, parseInt(t, 10) || 0));
+}
+
+var g_nightmareSurvivalFrames = 0;
+var g_newPersonalBestBanner = null; // { text: "...", timer: 180 }
+var g_defeatSelectedButton = 0; // 0: Restart Campaign, 1: Main Menu
+var g_resetHighScoreConfirmTimer = 0;
+var g_nightmareTransitionTimer = 0;
+
 var g_cheatsheetVisible = safeGetPref('da_cheatsheet_visible', '1') === '1'; // D-06
 var g_cheatsheetDock = safeGetPref('da_cheatsheet_dock', 'right'); // 'right' or 'left', D-10
 var g_cheatsheetSlideProgress = g_cheatsheetVisible ? 1.0 : 0.0; // D-08
@@ -105,7 +137,72 @@ var g_lobbyLockBannerTimer = 0;
 var g_lobbyLastBeepSecond = -1;
 var g_lobbyTransitioning = false;
 
+function performWaveMicroPurge() {
+	// Prune corpses exceeding 30s (1800 frames) or pool exceeding 60 items (D-19)
+	if (typeof g_corpses !== "undefined" && Array.isArray(g_corpses)) {
+		let maxAgeFrames = 30 * (typeof fps !== "undefined" && fps > 0 ? fps : 60);
+		for (let i = g_corpses.length - 1; i >= 0; i--) {
+			let corpse = g_corpses[i];
+			if (corpse && (corpse.timeAlive > maxAgeFrames || g_corpses.length > 60)) {
+				if (corpse.bloodEmitter && typeof corpse.bloodEmitter.destroy === "function") {
+					corpse.bloodEmitter.destroy();
+				}
+				if (typeof corpse.destroy === "function") {
+					corpse.destroy();
+				}
+				g_corpses.splice(i, 1);
+			}
+		}
+		while (g_corpses.length > 60) {
+			let old = g_corpses.shift();
+			if (old) {
+				if (old.bloodEmitter && typeof old.bloodEmitter.destroy === "function") {
+					old.bloodEmitter.destroy();
+				}
+				if (typeof old.destroy === "function") {
+					old.destroy();
+				}
+			}
+		}
+	}
+
+	// Prune splatters exceeding 60 count (D-19)
+	if (typeof g_splatter !== "undefined" && Array.isArray(g_splatter)) {
+		if (g_splatter.length > 60) {
+			g_splatter.splice(0, g_splatter.length - 60);
+		}
+	}
+
+	// Prune dynamic shadows beyond 20 tiles of player (D-19)
+	if (typeof g_shadows !== "undefined" && g_shadows && typeof g_player !== "undefined" && g_player && g_player.pos) {
+		for (let key in g_shadows) {
+			let sh = g_shadows[key];
+			if (sh && typeof sh.x === "number" && typeof sh.y === "number") {
+				let d = vec2(sh.x, sh.y).distance(g_player.pos);
+				if (d > 20) {
+					delete g_shadows[key];
+				}
+			}
+		}
+	}
+
+	// Reset expired or stray particle emitters in engineObjects (D-19)
+	if (typeof engineObjects !== "undefined" && Array.isArray(engineObjects)) {
+		for (let i = engineObjects.length - 1; i >= 0; i--) {
+			let obj = engineObjects[i];
+			if (obj && typeof ParticleEmitter !== "undefined" && obj instanceof ParticleEmitter) {
+				if (obj.emitTime === 0 || (obj.emitTimer && typeof obj.emitTimer.isSet === "function" && obj.emitTimer.isSet() && obj.emitTimer.elapsed() > 30)) {
+					if (typeof obj.destroy === "function") {
+						obj.destroy();
+					}
+				}
+			}
+		}
+	}
+}
+
 function enterLobbyState() {
+	performWaveMicroPurge();
 	if (g_player) {
 		g_savedEquipment = {
 			ammoPistol: Math.min(g_player.ammoBullets, LEVEL_TRANSITION_MAX_BULLETS),
@@ -163,7 +260,8 @@ function enterLobbyState() {
 	changeState(STATE_LOBBY);
 
 	if (typeof g_apgNetwork !== "undefined") {
-		g_apgNetwork.startPrediction(g_level + 1);
+		let predDuration = (g_level >= 5) ? 15 : 60;
+		g_apgNetwork.startPrediction(g_level + 1, predDuration);
 	}
 }
 
@@ -288,16 +386,32 @@ function findFreePosRange(minDist, maxDist, requireLineOfSight = false) {
 
 var enemiesSpawned = 0;
 function spawnEnemy() {
-	var p = findFreePos(5);
-	let enemyClass = getNextEnemySpawnClass();
+	let isNightmare = typeof g_level !== "undefined" && g_level >= 5;
+	var p = findFreePos(isNightmare ? 8 : 5);
 
 	let enemy;
-	if (enemyClass == "v") {
-		enemy = new Vampire(p);
-	} else if (enemyClass == "g") {
-		enemy = new Ghost(p);
+	if (isNightmare) {
+		// D-13: Fully randomized 4-enemy spawn distribution from Wave 1
+		// 40% Zombies, 25% Vampires, 25% Ghosts, 10% Boss Zombies
+		let r = rand();
+		if (r < 0.40) {
+			enemy = new Zombie(p);
+		} else if (r < 0.65) {
+			enemy = new Vampire(p);
+		} else if (r < 0.90) {
+			enemy = new Ghost(p);
+		} else {
+			enemy = new BossZombie(p);
+		}
 	} else {
-		enemy = new Zombie(p);
+		let enemyClass = getNextEnemySpawnClass();
+		if (enemyClass == "v") {
+			enemy = new Vampire(p);
+		} else if (enemyClass == "g") {
+			enemy = new Ghost(p);
+		} else {
+			enemy = new Zombie(p);
+		}
 	}
 	g_enemies.push(enemy);
 	enemiesSpawned++;
@@ -535,9 +649,10 @@ function updateStateOutcome() {
 	let isMidRunClear = matchSummary && matchSummary.state === STATE_CLEARED && !matchSummary.isGrandVictory;
 
 	if (isMidRunClear) {
-		// 6-second countdown bar for mid-run level clear (D-30)
+		// 6-second countdown bar for mid-run level clear (D-30), 4-second tally banner for Nightmare wave clear (D-04)
+		let maxTallySec = (typeof g_level !== "undefined" && g_level >= 5) ? 4 : 6;
 		let elapsedSec = Math.floor(getMsSinceStateChange() / 1000);
-		let remainingSec = Math.max(0, 6 - elapsedSec);
+		let remainingSec = Math.max(0, maxTallySec - elapsedSec);
 
 		if (remainingSec <= 0 || mouseWasPressed(0) || keyWasPressed(32) || gamepadWasPressed(0)) {
 			uiSound(3);
@@ -547,19 +662,72 @@ function updateStateOutcome() {
 			});
 		}
 	} else {
-		// Game Over or Level 5 Grand Victory pauses indefinitely (D-30)
-		if (mouseWasPressed(0) || keyWasPressed(32) || gamepadWasPressed(0)) {
-			uiSound();
-			uiFadeOutAndCall(() => {
-				startNewGame();
-				enterLobbyState();
-			});
-		} else if (keyWasPressed(27)) {
-			// ESC key returns to Title Screen (D-20)
-			uiFadeOutAndCall(() => {
-				startNewGame();
-				changeState(STATE_CLICK_TO_START);
-			});
+		// Defeat / Outcome screen
+		let isNightmareDefeat = (typeof g_level !== "undefined" && g_level >= 5) || (matchSummary && matchSummary.level > 5);
+		if (isNightmareDefeat) {
+			// Defeat screen keyboard / gamepad navigation (D-41, D-42)
+			if (keyWasPressed(87) || keyWasPressed(38) || gamepadWasPressed(12)) {
+				g_defeatSelectedButton = 0; // [RESTART CAMPAIGN]
+				uiSound(1);
+			}
+			if (keyWasPressed(83) || keyWasPressed(40) || gamepadWasPressed(13)) {
+				g_defeatSelectedButton = 1; // [MAIN MENU]
+				uiSound(1);
+			}
+
+			// Safe lower-center bounds [0.35W, 0.65W] x [0.78H, 0.90H]
+			let W = typeof mainCanvas !== "undefined" ? mainCanvas.width : 800;
+			let H = typeof mainCanvas !== "undefined" ? mainCanvas.height : 600;
+			let mX = (typeof mousePosScreen !== 'undefined' && mousePosScreen) ? mousePosScreen.x : -1;
+			let mY = (typeof mousePosScreen !== 'undefined' && mousePosScreen) ? mousePosScreen.y : -1;
+			let btnW = W * 0.30;
+			let btnH = H * 0.055;
+			let btn1Y = H * 0.81;
+			let btn2Y = H * 0.87;
+
+			let hoverBtn1 = Math.abs(mX - W * 0.5) < btnW / 2 && Math.abs(mY - btn1Y) < btnH / 2;
+			let hoverBtn2 = Math.abs(mX - W * 0.5) < btnW / 2 && Math.abs(mY - btn2Y) < btnH / 2;
+
+			if (hoverBtn1 && mouseWasPressed(0)) {
+				g_defeatSelectedButton = 0;
+			} else if (hoverBtn2 && mouseWasPressed(0)) {
+				g_defeatSelectedButton = 1;
+			}
+
+			let activate = keyWasPressed(13) || keyWasPressed(32) || gamepadWasPressed(0) || (mouseWasPressed(0) && (hoverBtn1 || hoverBtn2));
+			if (activate) {
+				uiSound();
+				if (g_defeatSelectedButton === 0) {
+					// [RESTART CAMPAIGN] - resets g_level = 0, enforcing campaign climb integrity (D-38, D-39)
+					uiFadeOutAndCall(() => {
+						g_level = 0;
+						startNewGame();
+						enterLobbyState();
+					});
+				} else {
+					// [MAIN MENU] - returns to Start Screen
+					uiFadeOutAndCall(() => {
+						g_level = 0;
+						startNewGame();
+						changeState(STATE_CLICK_TO_START);
+					});
+				}
+			}
+		} else {
+			// Campaign Game Over pauses indefinitely (D-30)
+			if (mouseWasPressed(0) || keyWasPressed(32) || gamepadWasPressed(0)) {
+				uiSound();
+				uiFadeOutAndCall(() => {
+					startNewGame();
+					enterLobbyState();
+				});
+			} else if (keyWasPressed(27)) {
+				// ESC key returns to Title Screen (D-20)
+				uiFadeOutAndCall(() => {
+					startNewGame();
+					changeState(STATE_CLICK_TO_START);
+				});
+			}
 		}
 	}
 }
@@ -569,6 +737,9 @@ function changeState(newState) {
 	textsClear();
 	stateChangedTime = new Date().getTime();
 	g_state = newState;
+	if (newState === STATE_DEAD && typeof soundDefeatCrash !== "undefined") {
+		soundDefeatCrash.play();
+	}
 	if ((newState === STATE_DEAD || newState === STATE_CLEARED) && typeof g_apgManager !== "undefined" && g_apgManager) {
 		g_apgManager.onMatchOrLevelEnd(newState);
 	}
@@ -596,6 +767,9 @@ var ammoCooldownFrames = 0;
 var levelCleared = false;
 
 function updateStatePlaying() {
+	if (typeof updateMusicDynamicScaling === "function") {
+		updateMusicDynamicScaling();
+	}
 	// game gets more difficult as you play
 	g_difficulty = 1 + ((g_level / levelDefs.length) | 0);
 
@@ -608,6 +782,9 @@ function updateStatePlaying() {
 	if (rand() < 0.1) pushers.push(new Pusher(g_player.pos, -0.001, 0, 5, rand(5), PushTo.ENEMIES));
 
 	updatePushers();
+	if (typeof g_level !== "undefined" && g_level >= 5) {
+		g_nightmareSurvivalFrames++;
+	}
 	if (typeof g_apgManager !== "undefined" && g_apgManager) g_apgManager.update();
 
 	textMiddle = getMsSinceStateChange() > 3000 ? "" : "Level " + (g_level + 1);
@@ -639,9 +816,46 @@ function updateStatePlaying() {
 	if (enemiesSpawned >= enemiesToSpawn && g_enemies.length <= 0) levelCleared = true;
 
 	if (levelCleared) {
+		if (g_level === 4) {
+			// Level 5 Boss clear transition into Endless Nightmare Gauntlet (D-01, D-05)
+			levelCleared = false;
+			if (typeof soundDivineFlash !== "undefined") soundDivineFlash.play();
+			if (typeof uiflashScreen === "function") uiflashScreen("#fbf236", 30);
+			if (g_player) g_player.hp = 3;
+			if (typeof g_savedEquipment !== "undefined" && g_savedEquipment) g_savedEquipment.playerHp = 3;
+			g_level = 5;
+			g_nightmareSurvivalFrames = 0;
+			uiFadeOutAndCall(() => {
+				enterLobbyState();
+			});
+			return;
+		}
+
+		if (g_level >= 5) {
+			// Immediately update persistent high score on wave completion (D-50)
+			let curWave = g_level - 4;
+			let bestW = getNightmareBestWave();
+			if (curWave > bestW) {
+				setNightmareBestWave(curWave);
+				let curTimeSec = Math.floor(g_nightmareSurvivalFrames / 60);
+				let bestT = getNightmareBestTime();
+				if (curTimeSec > bestT) {
+					setNightmareBestTime(curTimeSec);
+				}
+				g_newPersonalBestBanner = {
+					text: "★ NEW PERSONAL BEST WAVE " + curWave + "! ★",
+					timer: 180
+				};
+				if (typeof soundOutcomeGood !== "undefined") soundOutcomeGood.play();
+			}
+			if (typeof soundWaveSurvival !== "undefined") {
+				soundWaveSurvival.play();
+			}
+			performWaveMicroPurge();
+		}
+
 		changeState(STATE_CLEARED);
 		g_player.gun.reload();
-		//g_level++;
 		soundPlayExtra(soundLevelCleared, cameraPos, 2, 0.8, 0, 1000);
 		return;
 	}
@@ -653,7 +867,13 @@ function updateStatePlaying() {
 
 	if (g_player.hp <= 0) {
 		changeState(STATE_DEAD);
-		localStorage.da_t = max(g_score, localStorage.da_t || 0);
+		let curBestScore = parseInt(safeGetPref('da_high_score', '0'), 10) || 0;
+		if (g_score > curBestScore) {
+			safeSetPref('da_high_score', g_score);
+		}
+		try {
+			if (typeof localStorage !== 'undefined') localStorage.da_t = max(g_score, localStorage.da_t || 0);
+		} catch (e) {}
 		return;
 	}
 
@@ -687,8 +907,28 @@ function updateStatePlaying() {
 				.normalize(TILES_PER_SCREEN - 7)
 		);
 	}
-	// camera goes halfway between player and mouse
-	cameraPos = cameraPos.lerp(g_player.pos.add(newPoint.subtract(g_player.pos).scale(0.5)), 0.03);
+	// camera goes halfway between player and mouse, clamped so player never drifts closer than 4.5 tiles to screen edge (D-65)
+	let targetPos = g_player.pos.add(newPoint.subtract(g_player.pos).scale(0.5));
+	let halfW = (typeof mainCanvas !== "undefined" && typeof cameraScale !== "undefined" && cameraScale > 0) ? (mainCanvas.width / cameraScale) / 2 : 6.5;
+	let halfH = (typeof mainCanvas !== "undefined" && typeof cameraScale !== "undefined" && cameraScale > 0) ? (mainCanvas.height / cameraScale) / 2 : 6.5;
+	let maxLeadX = Math.max(0, halfW - 4.5);
+	let maxLeadY = Math.max(0, halfH - 4.5);
+	targetPos.x = clamp(targetPos.x, g_player.pos.x - maxLeadX, g_player.pos.x + maxLeadX);
+	targetPos.y = clamp(targetPos.y, g_player.pos.y - maxLeadY, g_player.pos.y + maxLeadY);
+
+	if (typeof tileCollisionSize !== "undefined" && tileCollisionSize && tileCollisionSize.x > 0 && tileCollisionSize.y > 0) {
+		if (tileCollisionSize.x >= 2 * halfW) {
+			targetPos.x = clamp(targetPos.x, halfW, tileCollisionSize.x - halfW);
+		} else {
+			targetPos.x = tileCollisionSize.x / 2;
+		}
+		if (tileCollisionSize.y >= 2 * halfH) {
+			targetPos.y = clamp(targetPos.y, halfH, tileCollisionSize.y - halfH);
+		} else {
+			targetPos.y = tileCollisionSize.y / 2;
+		}
+	}
+	cameraPos = cameraPos.lerp(targetPos, 0.03);
 
 	fx_updateScreenShake();
 
@@ -975,6 +1215,12 @@ const tileNumbers_door = 11;
 const DOOR_MAX_HP = 45;
 const WEAPON_DROP_COOLDOWN = 30; // 30 frames = 0.5s at 60fps
 
+// Nightmare horde scaling & boss concurrency caps (MODE-03, MODE-04, D-12, D-14)
+const BASE_NIGHTMARE_MOBS = 25;
+const MOB_SCALING_PER_WAVE = 3;
+const MAX_NIGHTMARE_MOBS = 40;
+const MAX_AUDIENCE_BOSSES = 5;
+
 // Reserve Ammo Caps (BAL-10, BAL-21, D-09)
 const MAX_AMMO_BULLETS = 36;
 const MAX_AMMO_SHELLS = 8; // Lowered from 12 to 8 (D-09)
@@ -1091,11 +1337,56 @@ const levelDefs = [
 ];
 
 
+function playSoundOccluded(sound, pos, baseVol = 1, pitch = 1) {
+	if (!sound || typeof sound.play !== 'function') return;
+	if (!pos) {
+		sound.play(undefined, baseVol, pitch);
+		return;
+	}
+	let vol = baseVol;
+	// Distance attenuation & door/wall occlusion check (D-32)
+	if (typeof g_player !== 'undefined' && g_player && g_player.pos) {
+		let dist = pos.distance(g_player.pos);
+		let occluded = false;
+		if (typeof tileCollisionRaycast === 'function' && tileCollisionRaycast(g_player.pos, pos)) {
+			occluded = true;
+		}
+		if (!occluded && typeof g_doors !== 'undefined') {
+			for (let key in g_doors) {
+				let d = g_doors[key];
+				if (d && !d.broken) {
+					let doorPos = vec2(d.x + 0.5, d.y + 0.5);
+					if (g_player.pos.distance(doorPos) + pos.distance(doorPos) < dist + 0.4) {
+						occluded = true;
+						break;
+					}
+				}
+			}
+		}
+		if (occluded) {
+			vol *= 0.6; // -40% muffling (D-32)
+		}
+	}
+	sound.play(pos, vol, pitch);
+}
+
 function soundPlayExtra(sound, pos, vol, pitch, rand = 0, delay = 0, repeat = 1, initDelay=0) {
 	for (let i = 0; i < repeat; i++) { 
-		setTimeout( () => sound.play(pos, vol, pitch, rand), initDelay + delay * (i+1) )
+		setTimeout( () => {
+			if (typeof playSoundOccluded === 'function') {
+				playSoundOccluded(sound, pos, vol, pitch);
+			} else {
+				sound.play(pos, vol, pitch, rand);
+			}
+		}, initDelay + delay * (i+1) );
 	}
- }
+}
+
+/// Barricade Doors & Wave Stingers (D-10, D-29, D-31)
+var soundDoorBash = new Sound([1.4, 0.05, 95, 0.02, 0.08, 0.18, 4, 2.2, -4.5, 0, 40, 0.04, 0.06, 1.2, 0, 0.1, 0.05, 0.75, 0.08, 0]);
+var soundDoorBreak = new Sound([2.0, 0.05, 140, 0.03, 0.22, 0.38, 4, 3.1, -6, 0, -80, 0.06, 0.08, 1.8, -12, 0.2, 0.1, 0.85, 0.14, 0.2]);
+var soundWaveSurvival = soundOutcomeGood;
+var soundDefeatCrash = soundOutcomeBad;
 
 
 
@@ -1288,6 +1579,48 @@ function musicResume() {
 
 	if (!source) {
 		source = music.play(vol);
+	}
+}
+
+var g_musicCurrentRate = 1.0;
+var g_musicDucked = false;
+
+function updateMusicDynamicScaling() {
+	if (!source) return;
+
+	// 1. Dynamic Tempo Escalation (+2 BPM per wave from 50 up to 70 max, D-28)
+	let waveNum = (typeof g_level !== "undefined" && g_level >= 5) ? (g_level - 4) : 0;
+	let targetBPM = Math.min(70, 50 + waveNum * 2);
+	let targetRate = targetBPM / 50;
+
+	if (source.playbackRate && typeof source.playbackRate.value === "number") {
+		source.playbackRate.value = targetRate;
+	}
+	g_musicCurrentRate = targetRate;
+
+	// 2. Dynamic Volume Ducking (-30% volume when <= 1 heart or >= 3 bosses, D-30)
+	let bossCount = (typeof g_enemies !== "undefined")
+		? g_enemies.filter(e => e && e.isAudienceBoss && e.hp > 0).length
+		: 0;
+	let isDanger = (typeof g_player !== "undefined" && g_player && g_player.hp <= 1) || bossCount >= 3;
+
+	if (isDanger !== g_musicDucked) {
+		g_musicDucked = isDanger;
+		if (music && typeof source.stop === 'function') {
+			try { source.stop(); } catch (e) {}
+			source = music.play(isDanger ? vol * 0.7 : vol);
+			if (source && source.playbackRate) {
+				source.playbackRate.value = targetRate;
+			}
+		}
+	}
+
+	// 3. Procedural Heartbeat Pulse at 1 HP (D-30)
+	if (typeof g_player !== "undefined" && g_player && g_player.hp === 1 && typeof g_state !== "undefined" && g_state === STATE_PLAYING) {
+		let cycle = (typeof frame !== "undefined" ? frame : 0) % 50;
+		if (cycle === 0 && typeof soundHeartbeat !== "undefined") {
+			soundHeartbeat.play();
+		}
 	}
 }
 
@@ -1660,11 +1993,17 @@ var g_apgNetwork = new APGNetwork();
 
 function getMaxActiveMobs(lvl) {
 	const levelIdx = typeof lvl === "number" ? lvl : typeof g_level !== "undefined" ? g_level : 0;
+	if (levelIdx >= 5) {
+		let wave = levelIdx - 4; // 1-indexed nightmare wave
+		let base = typeof BASE_NIGHTMARE_MOBS !== "undefined" ? BASE_NIGHTMARE_MOBS : 25;
+		let scale = typeof MOB_SCALING_PER_WAVE !== "undefined" ? MOB_SCALING_PER_WAVE : 3;
+		let cap = typeof MAX_NIGHTMARE_MOBS !== "undefined" ? MAX_NIGHTMARE_MOBS : 40;
+		return Math.min(cap, base + (wave - 1) * scale);
+	}
 	const caps = [15, 18, 20, 23, 25];
 	return caps[clamp(levelIdx, 0, caps.length - 1)];
 }
-const MAX_ACTIVE_MOBS = 25;
-const MAX_AUDIENCE_BOSSES = 2;
+var MAX_ACTIVE_MOBS = 40;
 
 // Base Action Impact Weights for Contributor Scoring (D-21)
 const ACTION_IMPACT_WEIGHTS = {
@@ -1747,6 +2086,12 @@ class APGManager {
 		this.commandPulseFrames = {};
 		this.cheatSheetFlare = { color: null, frames: 0, maxFrames: 0 };
 
+		// Sabotage pacing & Karma clutch state (D-24, D-25, D-60, D-61, D-62)
+		this.blackoutGracePeriodFrames = 0;
+		this.jamImmunityFrames = 0;
+		this.karmaClutchCooldown = 0;
+		this.bloodEclipseDimFrames = 0;
+
 		// Register network listeners
 		if (typeof g_apgNetwork !== "undefined" && g_apgNetwork) {
 			var self = this;
@@ -1803,6 +2148,10 @@ class APGManager {
 		this.commandLastTriggered = {};
 		this.commandPulseFrames = {};
 		this.cheatSheetFlare = { color: null, frames: 0, maxFrames: 0 };
+		this.blackoutGracePeriodFrames = 0;
+		this.jamImmunityFrames = 0;
+		this.karmaClutchCooldown = 0;
+		this.bloodEclipseDimFrames = 0;
 		this.clearActiveEffects();
 	}
 
@@ -1950,6 +2299,9 @@ class APGManager {
 			this.runStats.badActions++;
 		}
 
+		// Check 100% Karma Clutch Events (D-60..D-63)
+		this.checkKarmaClutchEvents();
+
 		// Weighted impact scoring (D-21) & chronological tracking (D-23)
 		let pts = ACTION_IMPACT_WEIGHTS[action] || 1;
 		let now = Date.now();
@@ -2032,6 +2384,30 @@ class APGManager {
 				if (gMap[rawUser]) {
 					gMap[rawUser].score += 5;
 					gMap[rawUser].clutchSave = true;
+				}
+			}
+		}
+
+		// Sabotage pacing & concurrency caps (D-24, D-25, D-26, D-27)
+		if (team === "bad") {
+			let isMajorSabotage = (action === "boss" || action === "blackout" || action === "jam" || action === "frenzy");
+			if (isMajorSabotage && this.getActiveSabotageCount() >= 2) {
+				this.addToast("[BAD] Sabotage cap reached (max 2 active)!", "bad");
+				return;
+			}
+			if (action === "blackout" && (this.blackoutGracePeriodFrames > 0 || this.timers.blackout > 0)) {
+				this.addToast("[BAD] Darkness immune (12s grace period)!", "bad");
+				return;
+			}
+			if (action === "jam" && (this.jamImmunityFrames > 0 || (g_player && g_player.gun && g_player.gun.isJammed))) {
+				this.addToast("[BAD] Weapon immune (post-reload 10s)!", "bad");
+				return;
+			}
+			if (action === "boss") {
+				let livingBosses = (typeof g_enemies !== "undefined" ? g_enemies.filter(e => e && e.isAudienceBoss && e.hp > 0) : []);
+				if (livingBosses.length >= (typeof MAX_AUDIENCE_BOSSES !== "undefined" ? MAX_AUDIENCE_BOSSES : 5)) {
+					this.addToast("[BAD] Boss cap reached (5/5 active)!", "bad");
+					return;
 				}
 			}
 		}
@@ -2178,15 +2554,22 @@ class APGManager {
 							return e && e.isAudienceBoss && e.hp > 0;
 					  })
 					: [];
-			if (this.finalStand || livingBosses.length >= MAX_AUDIENCE_BOSSES) {
+			if (this.finalStand || livingBosses.length >= (typeof MAX_AUDIENCE_BOSSES !== "undefined" ? MAX_AUDIENCE_BOSSES : 5)) {
 				if (livingBosses.length > 0) {
-					let b = livingBosses[0];
-					b.maxHp = (b.maxHp || 16) + 4;
-					b.hp = min(b.maxHp, b.hp + 4);
-					b.enrageMult = min(1.4, (b.enrageMult || 1.0) * 1.15);
-					b.twitchUser = rawUser;
-					this.addWorldPopup("[BOSS ENRAGED +4 HP!]", b.pos.add(vec2(0, 1.2)), colorSpark);
-					this.addToast("[BAD] @" + tag + " empowered [Boss] @" + tag + "!", "bad");
+					for (let j = 0; j < livingBosses.length; j++) {
+						let b = livingBosses[j];
+						b.maxHp = (b.maxHp || 16) + 4;
+						b.hp = min(b.maxHp, b.hp + 4);
+						b._maxSpeed = (b._maxSpeed || 0.16) * 1.10;
+						b.enrageMult = min(1.8, (b.enrageMult || 1.0) * 1.10);
+						b.enrageStacks = (b.enrageStacks || 0) + 1;
+						b.enraged = true;
+					}
+					if (typeof applyGlobalBossEnrage === "function") {
+						applyGlobalBossEnrage();
+					}
+					this.addWorldPopup("[ALL BOSSES ENRAGED +4 HP!]", livingBosses[0].pos.add(vec2(0, 1.2)), colorSpark);
+					this.addToast("[BAD] @" + tag + " unleashed GLOBAL BOSS ENRAGE!", "bad");
 				} else {
 					this.enrageExistingHorde(rawUser);
 					this.addToast("[BAD] @" + tag + " enraged Final Stand monsters!", "bad");
@@ -2311,7 +2694,8 @@ class APGManager {
 		if (typeof uiflashScreen === "function") uiflashScreen("#fbf236", 12);
 		if (typeof fx_shakeScreen === "function") fx_shakeScreen(1.2);
 		if (typeof soundDivineFlash !== "undefined") {
-			soundDivineFlash.play(g_player ? g_player.pos : typeof cameraPos !== "undefined" ? cameraPos : vec2(0));
+			let soundPos = (typeof mainCanvas !== "undefined" && mainCanvas) ? (g_player ? g_player.pos : typeof cameraPos !== "undefined" ? cameraPos : undefined) : undefined;
+			soundDivineFlash.play(soundPos);
 		}
 
 		if (g_player) {
@@ -2379,6 +2763,76 @@ class APGManager {
 		}
 	}
 
+	checkKarmaClutchEvents() {
+		if (this.karmaClutchCooldown > 0) return;
+		let total = this.goodActions + this.badActions;
+		if (total < 3) return; // Minimum 3 actions required to establish ratio
+
+		let goodPct = Math.round((this.goodActions / total) * 100);
+
+		// D-60: 100% Good Karma (Holy Flash)
+		if (goodPct >= 100) {
+			this.triggerDivineFlash("KARMA_HOLY_FLASH", "Chat (100% Good)", false);
+			// Vaporize airborne boss boulders
+			if (typeof engineObjects !== "undefined") {
+				for (let i = 0; i < engineObjects.length; i++) {
+					let o = engineObjects[i];
+					if (o && (typeof Boulder !== "undefined" && o instanceof Boulder)) {
+						o.destroy();
+					}
+				}
+			}
+			if (typeof g_enemies !== "undefined") {
+				for (let i = 0; i < g_enemies.length; i++) {
+					let e = g_enemies[i];
+					if (e && e.boulder) {
+						e.boulder.destroy();
+						e.boulder = undefined;
+						e.throwing = false;
+					}
+				}
+			}
+			this.addWorldPopup("★ 100% GOOD KARMA: HOLY FLASH! ★", g_player ? g_player.pos.add(vec2(0, 1.2)) : vec2(0), colorSpark);
+			this.addToast("★ 100% GOOD KARMA: HOLY FLASH ACTIVATED! ★", "good");
+
+			// Recenter to 50/50 with 10s cooldown lock (D-62)
+			let half = Math.max(1, Math.round(total / 2));
+			this.goodActions = half;
+			this.badActions = half;
+			this.karmaClutchCooldown = 600; // 10 seconds
+		}
+		// D-61: 100% Bad Karma (Blood Eclipse)
+		else if (goodPct <= 0) {
+			// 8-second blood frenzy (+35% speed)
+			this.timers.slow = 0;
+			this.timers.frenzy = 480; // 8 seconds
+			this.bloodEclipseDimFrames = 480; // Dim arena lights to 30%
+
+			// Instantly spawn 1 bonus audience boss
+			let livingBosses = (typeof g_enemies !== "undefined" ? g_enemies.filter(e => e && e.isAudienceBoss && e.hp > 0) : []);
+			if (livingBosses.length < (typeof MAX_AUDIENCE_BOSSES !== "undefined" ? MAX_AUDIENCE_BOSSES : 5)) {
+				let bossPos = (typeof findFreePosRange === "function") ? findFreePosRange(5.5, 9.0, false) : (typeof findFreePos === "function" ? findFreePos(6) : vec2(0));
+				let boss = new BossZombie(bossPos, true, "Chat (100% Bad)");
+				boss.spawnTelegraphFrames = 54;
+				g_enemies.push(boss);
+				if (typeof g_transforms !== "undefined") {
+					g_transforms.push({ pos: bossPos.copy(), life: 54, tileIndex: tileNumbers_beefyZombie });
+				}
+			}
+
+			if (typeof soundBossSpawn !== "undefined") soundBossSpawn.play();
+			if (typeof fx_shakeScreen === "function") fx_shakeScreen(1.0);
+			this.addWorldPopup("☠ 100% BAD KARMA: BLOOD ECLIPSE! ☠", g_player ? g_player.pos.add(vec2(0, 1.2)) : vec2(0), colorBlood);
+			this.addToast("☠ 100% BAD KARMA: BLOOD ECLIPSE ACTIVATED! ☠", "bad");
+
+			// Recenter to 50/50 with 10s cooldown lock (D-62)
+			let half = Math.max(1, Math.round(total / 2));
+			this.goodActions = half;
+			this.badActions = half;
+			this.karmaClutchCooldown = 600; // 10 seconds
+		}
+	}
+
 	triggerCheatSheetFlare(col, frames = 30) {
 		this.cheatSheetFlare = { color: col, frames: frames, maxFrames: frames };
 	}
@@ -2443,9 +2897,18 @@ class APGManager {
 		this.displayedGoodPct += (targetPct - this.displayedGoodPct) * 0.12;
 
 		// Decrement timers
+		let hadBlackout = this.timers.blackout > 0;
 		for (let t in this.timers) {
 			if (this.timers[t] > 0) this.timers[t]--;
 		}
+		if (hadBlackout && this.timers.blackout <= 0) {
+			this.blackoutGracePeriodFrames = 720; // 12-second grace period after blackout ends (D-24)
+		}
+
+		if (this.blackoutGracePeriodFrames > 0) this.blackoutGracePeriodFrames--;
+		if (this.jamImmunityFrames > 0) this.jamImmunityFrames--;
+		if (this.karmaClutchCooldown > 0) this.karmaClutchCooldown--;
+		if (this.bloodEclipseDimFrames > 0) this.bloodEclipseDimFrames--;
 
 		if (this.divineFlashCooldown > 0) {
 			this.divineFlashCooldown--;
@@ -2836,7 +3299,8 @@ class APGManager {
 		}
 
 		let curLevel = typeof g_level !== "undefined" ? g_level : 0;
-		let isGrandVictory = Boolean(newState === STATE_CLEARED && curLevel >= 4);
+		let isGrandVictory = false; // Endless post-Level 5 Nightmare Gauntlet replaces grand victory termination (D-01)
+		let isNightmare = curLevel >= 5;
 
 		if (newState === STATE_CLEARED) {
 			this.runStats.levelsCleared++;
@@ -2867,6 +3331,8 @@ class APGManager {
 			winner: winner,
 			reason: reason,
 			isGrandVictory: isGrandVictory,
+			isNightmare: isNightmare,
+			nightmareWave: isNightmare ? (curLevel - 4) : 0,
 			goodActions: this.goodActions,
 			badActions: this.badActions,
 			totalActions: total,
@@ -3132,8 +3598,23 @@ class APGManager {
 		let barY = Math.round(H - Math.max(24, u * 1.5));
 		let barW = Math.min(W * 0.42, u * 21);
 		let barH = Math.max(16, u * 1.15);
+
+		// D-63: Rapid pulse and flashing chevron edge indicators when Karma exceeds 80%
+		let isDangerRatio = (liveGoodPct >= 80 || liveBadPct >= 80);
+		let dangerPulse = isDangerRatio ? (1.0 + 0.08 * Math.sin(frame * 0.3)) : 1.0;
+		barH = barH * dangerPulse;
+
 		let barLeft = cx - barW / 2;
 		let barRight = cx + barW / 2;
+
+		if (isDangerRatio) {
+			let flashAlpha = (0.5 + 0.5 * Math.sin(frame * 0.4)) * meterAlpha;
+			if (liveGoodPct >= 80) {
+				drawTextWithOutline("<<< <<<", vec2(barLeft - u * 2.8, barY), u * 0.72, colorSpark.scale(flashAlpha), 2, new Color(0, 0, 0, flashAlpha));
+			} else {
+				drawTextWithOutline(">>> >>>", vec2(barRight + u * 2.8, barY), u * 0.72, colorBlood.scale(flashAlpha), 2, new Color(0, 0, 0, flashAlpha));
+			}
+		}
 
 		// Outer frame & background track
 		uiDrawRectScreen(vec2(cx, barY), vec2(barW + 4, barH + 4), colorWhite.scale(0.35 * meterAlpha));
@@ -3822,6 +4303,38 @@ class Enemy extends Mob {
 		this._maxSpeed = this._baseMaxSpeed * speedMult;
 		this.enemyAccel = accelSign * this._customBaseAccel * accelMult;
 
+		// Anti-Stall Nudge (D-57): Track mob displacement over 240 frames (4s).
+		// If displacement < 0.2 tiles while in pursuit, inject orthogonal nudge toward open corridor.
+		if (!this.antiStallStartPos || !this.antiStallTimer) {
+			this.antiStallStartPos = this.pos.copy();
+			this.antiStallTimer = 240;
+		} else {
+			this.antiStallTimer--;
+			if (this.antiStallTimer <= 0) {
+				let distMoved = this.pos.distance(this.antiStallStartPos);
+				if (distMoved < 0.2 && this.enemyToTarget && this.enemyToTarget.length() > 1.0) {
+					let targetDir = this.enemyToTarget.normalize();
+					let perp = (rand() < 0.5 ? 1 : -1);
+					let nudge = vec2(-targetDir.y * perp, targetDir.x * perp).scale(0.18);
+					this.applyForce(nudge);
+				}
+				this.antiStallStartPos = this.pos.copy();
+				this.antiStallTimer = 240;
+			}
+		}
+
+		// Doorway Force-Fields (D-56): Detect if within 2.0 tiles of any door opening
+		this.nearDoor = false;
+		if (typeof g_doors !== "undefined" && g_doors) {
+			for (let key in g_doors) {
+				let d = g_doors[key];
+				if (d && this.pos.distance(vec2(d.x + 0.5, d.y + 0.5)) <= 2.0) {
+					this.nearDoor = true;
+					break;
+				}
+			}
+		}
+
 		// think and look
 		if (this.enemyThinkPause-- <= 0) {
 			if (typeof g_player !== "undefined" && g_player) {
@@ -3836,7 +4349,10 @@ class Enemy extends Mob {
 		// take a step
 		if (rand() < 0.1) {
 			let force = vec2(0);
-			if (this.enemyToTarget) force = this.enemyToTarget.normalize(this.enemyAccel);
+			if (this.enemyToTarget) {
+				let jitterMult = this.nearDoor ? (1 + (rand() - 0.5) * 0.3) : 1; // +/-15% forward velocity jitter per D-56
+				force = this.enemyToTarget.normalize(this.enemyAccel * jitterMult);
+			}
 
 			let jitter = randInCircle(this.enemyJitterForce);
 			force = force.add(jitter);
@@ -3851,13 +4367,35 @@ class Enemy extends Mob {
 	}
 
 	collideWithTile(tileData, tilePos) {
-		// Stuck-door anti-softlock bash (D-03): after ~3s pressed against a door, smash it open
 		if (tileData == tileNumbers_door) {
-			this.doorStuckFrames = (this.doorStuckFrames || 0) + 1;
-			if (this.doorStuckFrames > 180) {
-				breakDoorAt(tilePos.x, tilePos.y, true);
-				this.doorStuckFrames = 0;
+			if (this instanceof Ghost || this.tileIndex == tileNumbers_ghost) {
+				// Ghosts phase through closed barricade doors unhindered (D-47)
 				return false;
+			}
+			let idx = Math.floor(tilePos.x) + "_" + Math.floor(tilePos.y);
+			let door = typeof g_doors !== "undefined" ? g_doors[idx] : null;
+			if (door && !door.broken) {
+				this.doorBashTimer = (this.doorBashTimer || 0) + 1;
+				// Throttled bash attack: normal mobs deal 2 HP/sec (deals 1 damage every 30 frames)
+				// Bosses deal 15 damage per hit (D-44)
+				let bashInterval = this instanceof BossZombie ? 60 : 30;
+				if (this.doorBashTimer >= bashInterval) {
+					this.doorBashTimer = 0;
+					let dmg = this instanceof BossZombie ? 15 : 1;
+					door.hp -= dmg;
+					if (typeof spawnSplinterParticles === "function") {
+						spawnSplinterParticles(door.x, door.y, 2);
+					}
+					if (typeof soundDoorBash !== "undefined" && soundDoorBash && soundDoorBash.play) {
+						soundDoorBash.play(vec2(door.x, door.y));
+					} else if (typeof soundBoulderDestroy !== "undefined" && soundBoulderDestroy && soundBoulderDestroy.play) {
+						soundBoulderDestroy.play(vec2(door.x, door.y), 0.8);
+					}
+					if (door.hp <= 0.05) {
+						breakDoorAt(door.x, door.y, true);
+					}
+				}
+				return true;
 			}
 		}
 
@@ -3875,11 +4413,13 @@ class Enemy extends Mob {
 
 	collideWithObject(o) {
 		if (o instanceof Enemy) {
-			const TOO_CLOSE = 0.7;
+			// Doorway Force-Fields (D-56): +50% lateral repulsion near doorways (1.05 vs 0.7)
+			const TOO_CLOSE = (this.nearDoor || o.nearDoor) ? 1.05 : 0.7;
 
 			let toOther = o.pos.subtract(this.pos);
 			if (toOther.length() < TOO_CLOSE) {
-				let pushForce = toOther.normalize(rand(0.1) / (toOther.length() + 0.001));
+				let mult = (this.nearDoor || o.nearDoor) ? 1.5 : 1.0;
+				let pushForce = toOther.normalize((rand(0.1) * mult) / (toOther.length() + 0.001));
 				o.applyForce(pushForce);
 				this.groan(0.1, 0.9, 1);
 			}
@@ -3928,12 +4468,14 @@ class Enemy extends Mob {
 			}
 
 			if (this instanceof BossZombie) {
-				if (this.isAudienceBoss) {
-					// D-08: Audience Mini-Boss does NOT end the level or wipe other enemies!
-					g_score += 4; // +4 here + 1 below = +5 bonus score
+				let isNightmare = typeof g_level !== "undefined" && g_level >= 5;
+				if (this.isAudienceBoss || isNightmare) {
+					// D-08, D-14, D-20: Defeating any boss in Nightmare drops Full Care Package
+					g_score += 4;
 					let gunTile = g_player && g_player.gun ? g_player.gun.tileIndex : tileNumbers_pistol;
-					// D-05: Mini-boss drops Full Care Package (isFullPackage = true)
-					new AmmoBox(this.pos.copy(), gunTile, this.twitchUser, false, true);
+					// Radial scatter deconfliction (1.5-2.0 tile search) so multiple crates never overlap (D-23)
+					let dropPos = typeof findScatterDropPos === "function" ? findScatterDropPos(this.pos) : this.pos.copy();
+					new AmmoBox(dropPos, gunTile, this.twitchUser || "NightmareBoss", false, true);
 					if (typeof g_apgManager !== "undefined" && g_apgManager) {
 						g_apgManager.onEnemyKilled(this);
 					}
@@ -4025,6 +4567,18 @@ class Enemy extends Mob {
 		pos = this.pos.add(vec2(-chestWidth, chestHeight));
 		drawLine(pos, pos.add(pointing), 1.2 / 12, this._armColor, !!glEnable);
 	}
+}
+
+/**
+ * Returns dynamic concurrency scaling cap (25 to 40 entities) for Nightmare waveNum (D-12).
+ * Wave 1: 25, Wave 2: 28, Wave 3: 31, Wave 4: 34, Wave 5: 37, Wave 6+: 40
+ */
+function getMaxMobsForWave(waveNum) {
+	let w = typeof waveNum === "number" ? waveNum : 1;
+	let base = typeof BASE_NIGHTMARE_MOBS !== "undefined" ? BASE_NIGHTMARE_MOBS : 25;
+	let scale = typeof MOB_SCALING_PER_WAVE !== "undefined" ? MOB_SCALING_PER_WAVE : 3;
+	let cap = typeof MAX_NIGHTMARE_MOBS !== "undefined" ? MAX_NIGHTMARE_MOBS : 40;
+	return Math.min(cap, base + (w - 1) * scale);
 }
 
 /** @format */
@@ -4132,6 +4686,9 @@ class Gun extends EngineObject {
 					if (this.ammo == this._maxAmmo || this.noExtraAmmo) {
 						this.reloadTimer.unset();
 						this.reloading = false;
+						if (typeof g_apgManager !== "undefined" && g_apgManager) {
+							g_apgManager.jamImmunityFrames = 600; // 10s jam immunity post-reload (D-25)
+						}
 						if (this.isJammed) {
 							// jammed reload finished -> restore normal reload speed
 							this.isJammed = false;
@@ -4321,12 +4878,12 @@ class AmmoBox extends EngineObject {
 	}
 
 	constructor(pos, gunType, twitchUser = null, isScavenged = false, isFullPackage = false) {
-		// D-19: Scavenged clips render at 0.75x tile scale
-		let boxSize = isScavenged ? vec2(0.75) : vec2(1);
+		// D-19, D-21: Scavenged clips render at 0.75x tile scale, Full Care Packages at 1.25x scale
+		let boxSize = isScavenged ? vec2(0.75) : isFullPackage ? vec2(1.25) : vec2(1);
 		super(pos, boxSize, getAmmoForGunType(gunType), TILE_SIZE);
 
 		this._hitbox = vec2(0.5);
-		// Phase 3 APG care package attribution (D-01, NAME-03)
+		// Phase 3 & 23 APG care package attribution (D-01, D-14, D-20, NAME-03)
 		this.twitchUser = twitchUser;
 		this.isScavenged = Boolean(isScavenged);
 		this.isFullPackage = Boolean(isFullPackage);
@@ -4335,7 +4892,8 @@ class AmmoBox extends EngineObject {
 
 	update() {
 		let curFrame = typeof frame !== "undefined" ? frame : 0;
-		let maxLife = this.isScavenged ? 1500 : this.twitchUser ? 1800 : Infinity;
+		// Full Care Packages persist for 60 seconds (3600 frames) per D-22
+		let maxLife = this.isFullPackage ? 3600 : this.isScavenged ? 1500 : this.twitchUser ? 1800 : Infinity;
 		let elapsed = curFrame - this.spawnFrame;
 
 		if (elapsed >= maxLife) {
@@ -4360,12 +4918,17 @@ class AmmoBox extends EngineObject {
 				}
 				// D-19: Lighter high-pitch pickup chirp for scavenged clips
 				soundPickup.play(this.pos, 0.7, 1.6);
-			} else if (this.twitchUser) {
+			} else if (this.twitchUser || this.isFullPackage) {
 				if (this.isFullPackage) {
-					// D-05: Slain audience mini-boss Full Care Package reward
-					g_player.ammoBullets += 4;
-					g_player.ammoShells += 2;
-					g_player.ammoRifle += 1;
+					// D-14, D-20: Slain boss Full Care Package reward (+6 bullets, +3 shells, +2 rifle, +1 heart/shield capped at 4 HP)
+					g_player.ammoBullets += 6;
+					g_player.ammoShells += 3;
+					g_player.ammoRifle += 2;
+					if (g_player.hp < 3) {
+						g_player.hp = Math.min(3, g_player.hp + 1);
+					} else {
+						g_player.hp = Math.min(4, g_player.hp + 1); // Shield pip up to 4 HP max
+					}
 				} else {
 					// D-12, BAL-17: Pure Primary Yields (zero cross-pool bleed)
 					let activeGun = g_player.gun ? g_player.gun.tileIndex : tileNumbers_pistol;
@@ -4402,15 +4965,51 @@ class AmmoBox extends EngineObject {
 
 	render() {
 		let curFrame = typeof frame !== "undefined" ? frame : 0;
-		let maxLife = this.isScavenged ? 1500 : this.twitchUser ? 1800 : Infinity;
+		let maxLife = this.isFullPackage ? 3600 : this.isScavenged ? 1500 : this.twitchUser ? 1800 : Infinity;
 		let remaining = maxLife - (curFrame - this.spawnFrame);
 
-		// D-14, D-15: Final 5-second rapid flashing warning (toggle every 4 frames ~7.5Hz)
-		if (remaining <= 300 && Math.floor(curFrame / 4) % 2 === 0) {
+		// D-14, D-15, D-22: Final warning rapid flashing (10 seconds remaining for Full Care Package = 600 frames)
+		let flashThreshold = this.isFullPackage ? 600 : 300;
+		if (remaining <= flashThreshold && Math.floor(curFrame / 4) % 2 === 0) {
 			return;
 		}
+
+		if (this.isFullPackage) {
+			// Golden metallic border glow (#FFD700), subtle sparkle particles, vertical light beam (D-21)
+			drawRect(this.pos, this.size.scale(1.2), new Color(1, 215 / 255, 0, 0.4));
+			let beamHeight = 4.0;
+			let beamPos = this.pos.add(vec2(0, beamHeight / 2));
+			drawRect(beamPos, vec2(0.5, beamHeight), new Color(1, 215 / 255, 0, 0.25));
+			let pulse = 0.8 + 0.2 * Math.sin(curFrame / 10);
+			drawRect(this.pos, vec2(this.size.x * pulse), new Color(1, 215 / 255, 0, 0.2));
+		}
+
 		super.render();
 	}
+}
+
+/**
+ * Radial scatter deconfliction search (1.5 - 2.0 tiles) so care packages never overlap per D-23.
+ */
+function findScatterDropPos(origin) {
+	if (!origin) return vec2(5, 5);
+	for (let i = 0; i < 16; i++) {
+		let ang = rand(PI * 2);
+		let r = rand(1.5, 2.0);
+		let p = origin.add(vec2(Math.cos(ang) * r, Math.sin(ang) * r));
+		if (typeof tileCollisionTest === "function" && tileCollisionTest(p, vec2(0.8))) continue;
+		let overlaps = false;
+		if (typeof engineObjects !== "undefined") {
+			for (let obj of engineObjects) {
+				if (obj instanceof AmmoBox && obj.pos && obj.pos.distance(p) < 1.0) {
+					overlaps = true;
+					break;
+				}
+			}
+		}
+		if (!overlaps) return p;
+	}
+	return origin.copy();
 }
 
 /** @format */
@@ -4745,13 +5344,16 @@ function fx_addSpark (pos) {
 }
 
 function fx_shakeScreen (amt) {
+	amt = Math.min(0.35, Math.max(0, amt));
 	g_screenShake = vec2(rand(-amt, amt), rand(-amt, amt));
 }
 
 function fx_updateScreenShake () {
 
-	if (g_screenShake.length() > 0.01) {
-		g_screenShake = g_screenShake.multiply(vec2(-0.7));
+	if (g_screenShake && g_screenShake.length() > 0.01) {
+		g_screenShake = g_screenShake.multiply(vec2(-0.6));
+	} else if (g_screenShake) {
+		g_screenShake = vec2(0, 0);
 	}
 
 }
@@ -5501,10 +6103,40 @@ class BossZombie extends Enemy {
 		this.soundTearing = soundBossTearing;
 
 		this.miniFace = miniTileNumbers_miniFaceBoss;
+
+		// Phase 23: 8-second wall tearing throttle (480 frames) and enrage tracking (D-14, D-15)
+		this.wallTearCooldown = 0;
+		this.enrageStacks = 0;
 	}
 
 	update() {
 		if (g_state == STATE_DEAD) return;
+
+		if (this.wallTearCooldown > 0) {
+			this.wallTearCooldown--;
+		}
+
+		// Bulldozer parting field: lateral outward impulse within 2.5 tiles (D-58)
+		if (typeof g_enemies !== "undefined" && g_enemies) {
+			for (let i = 0; i < g_enemies.length; i++) {
+				let m = g_enemies[i];
+				if (m && m !== this && !(m instanceof BossZombie) && m.hp > 0 && m.pos) {
+					let d = this.pos.distance(m.pos);
+					if (d < 2.5 && d > 0.01) {
+						let moveDir = this.velocity && (this.velocity.x || this.velocity.y) ? this.velocity.normalize() : vec2(0, 1);
+						let perp = vec2(-moveDir.y, moveDir.x);
+						let toMinion = m.pos.subtract(this.pos);
+						let side = toMinion.dot(perp) >= 0 ? 1 : -1;
+						let impulse = perp.scale(side * 0.12 * (1 - d / 2.5));
+						if (typeof m.applyForce === "function") {
+							m.applyForce(impulse);
+						} else if (m.velocity) {
+							m.velocity = m.velocity.add(impulse);
+						}
+					}
+				}
+			}
+		}
 
 		// portal telegraph / Divine Flash stun pause all boulder behaviour (D-07, D-15)
 		if (this.spawnTelegraphFrames > 0 || this.stunFrames > 0) {
@@ -5549,6 +6181,13 @@ class BossZombie extends Enemy {
 	}
 
 	postRender() {
+		// Enrage aura (D-14)
+		if (this.enrageStacks > 0 || this.enraged) {
+			let curFrame = typeof frame !== "undefined" ? frame : 0;
+			let auraAlpha = 0.35 + 0.15 * Math.sin(curFrame / 6);
+			drawRect(this.pos, this.size.scale(1.25), new Color(1, 0, 0, auraAlpha));
+		}
+
 		// draw face
 		let lookRight = typeof g_player !== "undefined" && g_player ? g_player.pos.subtract(this.pos).x > -1 : false;
 		drawTile(
@@ -5565,25 +6204,41 @@ class BossZombie extends Enemy {
 	}
 
 	collideWithTile(tileData, pos) {
-		if (this.tearing) return;
+		if (this.tearing) return true;
 		// no wall tearing while frozen in a spawn portal or holy-stunned (D-07, D-15)
 		if (this.spawnTelegraphFrames > 0 || this.stunFrames > 0) return true;
 
+		// 8-second wall tearing throttle (480 frames) per D-15
+		if (this.wallTearCooldown > 0) return true;
+
+		// Perimeter boundary walls are strictly immune to boss tearing per D-15
+		let mapW = typeof tileLayer !== "undefined" && tileLayer ? tileLayer.size.x : (typeof mapData !== "undefined" && typeof g_levelDef !== "undefined" && mapData[g_levelDef.map] ? mapData[g_levelDef.map].w : 100);
+		let mapH = typeof tileLayer !== "undefined" && tileLayer ? tileLayer.size.y : (typeof mapData !== "undefined" && typeof g_levelDef !== "undefined" && mapData[g_levelDef.map] ? mapData[g_levelDef.map].h : 100);
+		if (pos.x <= 0 || pos.y <= 0 || pos.x >= mapW - 1 || pos.y >= mapH - 1) {
+			return true;
+		}
+
 		// tearing out a door counts as breaking it, keep the registry in sync (D-02)
 		if (tileData == tileNumbers_door) {
-			let door = g_doors[pos.x + "_" + pos.y];
+			let idx = Math.floor(pos.x) + "_" + Math.floor(pos.y);
+			let door = typeof g_doors !== "undefined" ? g_doors[idx] : null;
 			if (door) {
 				door.hp = 0;
 				door.broken = true;
 			}
 		}
 
-		if (pos.x > 0 && pos.y > 0 && pos.x < tileLayer.size.x - 1 && pos.y < tileLayer.size.y - 1) {
-			tileLayer.setData(pos, 0, true);
-			setTileCollisionData(pos, 0);
+		if (pos.x > 0 && pos.y > 0 && pos.x < mapW - 1 && pos.y < mapH - 1) {
+			if (typeof tileLayer !== "undefined" && tileLayer) {
+				tileLayer.setData(pos, 0, true);
+			}
+			if (typeof setTileCollisionData === "function") {
+				setTileCollisionData(pos, 0);
+			}
 		}
 
 		this.tearing = true;
+		this.wallTearCooldown = 480; // 8-second throttle (480 frames at 60 FPS) per D-15
 		this.soundTearing.play(this.pos);
 
 		// tear out chunk
@@ -5592,6 +6247,43 @@ class BossZombie extends Enemy {
 		this.tearingTimer = new Timer(1);
 
 		return true;
+	}
+}
+
+/**
+ * Returns active living boss count in current room (D-14).
+ */
+function getActiveBossCount() {
+	if (typeof g_enemies === "undefined" || !g_enemies) return 0;
+	let count = 0;
+	for (let i = 0; i < g_enemies.length; i++) {
+		if (g_enemies[i] instanceof BossZombie && g_enemies[i].hp > 0) {
+			count++;
+		}
+	}
+	return count;
+}
+
+/**
+ * Applies global boss enrage to all living active bosses when boss cap is reached (D-14).
+ */
+function applyGlobalBossEnrage() {
+	if (typeof g_enemies === "undefined" || !g_enemies) return;
+	for (let i = 0; i < g_enemies.length; i++) {
+		let b = g_enemies[i];
+		if (b instanceof BossZombie && b.hp > 0) {
+			b.hp += 4;
+			b.maxHp = (b.maxHp || b.hp) + 4;
+			b._maxSpeed = (b._maxSpeed || 0.16) * 1.10;
+			b.enrageStacks = (b.enrageStacks || 0) + 1;
+			b.enraged = true;
+			if (typeof fx_shakeScreen === "function") {
+				fx_shakeScreen(0.4);
+			}
+		}
+	}
+	if (typeof soundBossRoar !== "undefined" && soundBossRoar && soundBossRoar.play) {
+		soundBossRoar.play();
 	}
 }
 
@@ -7263,6 +7955,40 @@ function renderStartScreenBadges(cx, H, u, safeW) {
         drawTextWithOutline(`PREVIOUS SCORE: ${g_score}  ★  HIGH SCORE: ${topScore}`, vec2(cx, scoreY), Math.max(11, u * 0.60), colorSpark);
     }
 
+    // 16-Bit Retro Arcade Record Plaque (D-18)
+    const plaqueY = (typeof g_score !== 'undefined' && g_score > 0) ? H * 0.49 : H * 0.53;
+    const plaqueW = Math.min(safeW * 0.72, u * 22);
+    const plaqueH = u * 1.5;
+
+    overlayContext.save();
+    overlayContext.fillStyle = 'rgba(18, 14, 24, 0.90)';
+    overlayContext.fillRect(cx - plaqueW / 2, plaqueY - plaqueH / 2, plaqueW, plaqueH);
+    overlayContext.strokeStyle = '#792138';
+    overlayContext.lineWidth = 1.4;
+    overlayContext.strokeRect(cx - plaqueW / 2, plaqueY - plaqueH / 2, plaqueW, plaqueH);
+
+    // Corner rivets in gold
+    overlayContext.fillStyle = '#D4AF37';
+    overlayContext.fillRect(cx - plaqueW / 2 + 3, plaqueY - plaqueH / 2 + 3, 3, 3);
+    overlayContext.fillRect(cx + plaqueW / 2 - 6, plaqueY - plaqueH / 2 + 3, 3, 3);
+    overlayContext.fillRect(cx - plaqueW / 2 + 3, plaqueY + plaqueH / 2 - 6, 3, 3);
+    overlayContext.fillRect(cx + plaqueW / 2 - 6, plaqueY + plaqueH / 2 - 6, 3, 3);
+
+    let bestWave = typeof getNightmareBestWave === "function" ? getNightmareBestWave() : parseInt(safeGetPref('da_nightmare_best_wave', '0'), 10) || 0;
+    let bestTime = typeof getNightmareBestTime === "function" ? getNightmareBestTime() : parseInt(safeGetPref('da_nightmare_best_time', '0'), 10) || 0;
+    let plaqueStr = "";
+    if (bestWave > 0) {
+        let mins = Math.floor(bestTime / 60);
+        let secs = bestTime % 60;
+        let timeStr = (mins < 10 ? "0" + mins : "" + mins) + ":" + (secs < 10 ? "0" + secs : "" + secs);
+        plaqueStr = "BEST SURVIVAL: WAVE " + bestWave + " - " + timeStr;
+    } else {
+        plaqueStr = "BEST SURVIVAL: WAVE -- - --:--";
+    }
+
+    drawTextWithOutline(plaqueStr, vec2(cx, plaqueY), Math.max(11, u * 0.58), colorSpark);
+    overlayContext.restore();
+
     // 1. All-Time Records Trophy Ledger Plate (D-08)
     const ledgerY = H * 0.60;
     const ledgerW = Math.min(safeW * 0.88, u * 28);
@@ -8339,6 +9065,50 @@ function uiDrawHeartPipWorld(worldPos, scale, stateType) {
 	}
 }
 
+function drawPixelSkull(ctx, cx, cy, size, pulseAlpha, mirror = false) {
+	if (!ctx) return;
+	ctx.save();
+	ctx.translate(cx, cy);
+	if (mirror) ctx.scale(-1, 1);
+	let ps = size / 12;
+	let ox = -size / 2;
+	let oy = -size / 2;
+
+	const skullRows = [
+		"   XXXXXX   ",
+		"  XXXXXXXX  ",
+		" XXXXXXXXXX ",
+		" XXXXXXXXXX ",
+		" XXX..XX..XX",
+		" XXX..XX..XX",
+		"  XXXXXXXX  ",
+		"   XXXXXX   ",
+		"   XX..XX   ",
+		"   XXXXXX   ",
+		"   X.XX.X   ",
+		"   XXXXXX   "
+	];
+
+	ctx.fillStyle = "#E0E0E0";
+	for (let r = 0; r < 12; r++) {
+		let row = skullRows[r];
+		for (let c = 0; c < 12; c++) {
+			if (row[c] === 'X') {
+				ctx.fillRect(ox + c * ps, oy + r * ps, ps + 0.5, ps + 0.5);
+			}
+		}
+	}
+
+	let eyeAlpha = Math.max(0.2, Math.min(1.0, pulseAlpha));
+	ctx.fillStyle = `rgba(255, 30, 30, ${eyeAlpha.toFixed(2)})`;
+	ctx.shadowColor = "#FF0000";
+	ctx.shadowBlur = 6;
+	ctx.fillRect(ox + 3 * ps, oy + 4 * ps, 2 * ps, 2 * ps);
+	ctx.fillRect(ox + 7 * ps, oy + 4 * ps, 2 * ps, 2 * ps);
+	ctx.shadowBlur = 0;
+	ctx.restore();
+}
+
 function renderLobbyHUD() {
 	let pred =
 		typeof g_apgNetwork !== "undefined" && g_apgNetwork.prediction
@@ -8369,21 +9139,42 @@ function renderLobbyHUD() {
 	uiDrawRectScreen(vec2(cx, H * 0.52), vec2(cardW + 4, cardH + 4), colorWhite.scale(0.25));
 	uiDrawRectScreen(vec2(cx, H * 0.52), vec2(cardW, cardH), new Color(0.05, 0.05, 0.07, 0.86));
 
-	// 2. Flickering Blood-Red Header (D-21, D-22, CLIP-05)
-	const headerText = "LEVEL " + (g_level + 1) + ": WILL CHAT BE GOOD OR BAD?";
+	// 2. Header: Nightmare Wave or Campaign Level (D-03, D-21, D-22, CLIP-05)
+	let isNightmareLobby = (typeof g_level !== "undefined" && g_level >= 5);
+	let headerText = isNightmareLobby
+		? "NIGHTMARE WAVE " + (g_level - 4) + ": Will streamer survive?"
+		: "LEVEL " + (g_level + 1) + ": WILL CHAT BE GOOD OR BAD?";
 	const baseHeaderSize = Math.min(u * 1.45, W / 24);
 	const headerFontScale = Math.min(1.0, (cardW - u * 1.6) / Math.max(1, headerText.length * (baseHeaderSize * 0.60)));
 	const headerSize = baseHeaderSize * headerFontScale;
-	let flicker = (1.5 + Math.sin(frame / 50)) * 0.005;
-	for (let i = 0; i < 10; i++) {
-		drawTextScreen(
-			headerText,
-			vec2(rand(1 - flicker, 1 + flicker) * cx, rand(1 - flicker, 1 + flicker) * (H * 0.17)),
-			headerSize,
-			colorBlack.lerp(colorBlood, i / 10)
-		);
+
+	if (isNightmareLobby) {
+		let bannerW = Math.min(cardW - u * 2, headerText.length * (headerSize * 0.58) + u * 6);
+		let bannerH = headerSize * 1.8;
+		let bannerY = H * 0.17;
+		uiDrawRectScreen(vec2(cx, bannerY), vec2(bannerW + 6, bannerH + 6), new Color(121 / 255, 33 / 255, 56 / 255, 0.95));
+		uiDrawRectScreen(vec2(cx, bannerY), vec2(bannerW, bannerH), new Color(86 / 255, 0 / 255, 57 / 255, 0.95));
+
+		drawTextWithOutline(headerText, vec2(cx, bannerY), headerSize, colorWhite);
+
+		let pulseAlpha = 0.5 + 0.5 * Math.sin(frame / 10);
+		let skullSize = Math.min(u * 2.2, bannerH * 0.75);
+		let skullLeftX = cx - bannerW * 0.45;
+		let skullRightX = cx + bannerW * 0.45;
+		drawPixelSkull(overlayContext, skullLeftX, bannerY, skullSize, pulseAlpha, false);
+		drawPixelSkull(overlayContext, skullRightX, bannerY, skullSize, pulseAlpha, true);
+	} else {
+		let flicker = (1.5 + Math.sin(frame / 50)) * 0.005;
+		for (let i = 0; i < 10; i++) {
+			drawTextScreen(
+				headerText,
+				vec2(rand(1 - flicker, 1 + flicker) * cx, rand(1 - flicker, 1 + flicker) * (H * 0.17)),
+				headerSize,
+				colorBlack.lerp(colorBlood, i / 10)
+			);
+		}
+		drawTextWithOutline(headerText, vec2(cx, H * 0.17), headerSize, colorBlood);
 	}
-	drawTextWithOutline(headerText, vec2(cx, H * 0.17), headerSize, colorBlood);
 
 	// 3. Poll Mode Subtitle Pill (D-22)
 	const isHelix = pred.mode === "helix";
@@ -8496,6 +9287,139 @@ function renderLobbyHUD() {
 	drawTextWithOutline(promptText, vec2(cx, H * 0.88), u * 0.78 * promptFontScale, colorSpark.scale(promptAlpha));
 }
 
+function renderNightmareTelemetryPlate(W, H, u) {
+	if (typeof g_level === "undefined" || g_level < 5 || (typeof g_state !== "undefined" && g_state !== STATE_PLAYING)) return;
+	if (typeof overlayContext === "undefined" || !overlayContext) return;
+
+	overlayContext.save();
+	let plateX = W * 0.38;
+	let plateW = W * 0.24;
+	let plateY = H * 0.02;
+	let plateH = H * 0.06;
+
+	overlayContext.fillStyle = "rgba(30, 0, 10, 0.85)";
+	overlayContext.fillRect(plateX, plateY, plateW, plateH);
+	overlayContext.strokeStyle = "#792138";
+	overlayContext.lineWidth = 1.6;
+	overlayContext.strokeRect(plateX, plateY, plateW, plateH);
+
+	let curWave = g_level - 4;
+	let waveText = "NIGHTMARE WAVE " + curWave;
+
+	let totalSec = Math.floor((typeof g_nightmareSurvivalFrames !== "undefined" ? g_nightmareSurvivalFrames : 0) / 60);
+	let mins = Math.floor(totalSec / 60);
+	let secs = totalSec % 60;
+	let clockText = (mins < 10 ? "0" + mins : "" + mins) + ":" + (secs < 10 ? "0" + secs : "" + secs);
+
+	let mobAlive = typeof g_enemies !== "undefined" ? g_enemies.length : 0;
+	let mobCap = typeof getMaxActiveMobs === "function" ? getMaxActiveMobs(g_level) : 40;
+	let mobText = "MOBS: " + mobAlive + "/" + mobCap;
+
+	let textY = plateY + plateH * 0.62;
+	let fontSize = Math.max(10, Math.min(u * 0.62, plateH * 0.42));
+
+	overlayContext.font = "bold " + fontSize + "px " + fontDefault;
+	overlayContext.textBaseline = "middle";
+
+	overlayContext.textAlign = "left";
+	overlayContext.fillStyle = "#FBF236";
+	overlayContext.fillText(waveText, plateX + 10, textY);
+
+	overlayContext.textAlign = "center";
+	overlayContext.fillStyle = "#FFFFFF";
+	overlayContext.fillText(clockText, plateX + plateW * 0.52, textY);
+
+	overlayContext.textAlign = "right";
+	overlayContext.fillStyle = mobAlive >= mobCap ? "#AC3232" : "#999999";
+	overlayContext.fillText(mobText, plateX + plateW - 10, textY);
+
+	overlayContext.restore();
+}
+
+function renderNightmareDefeatHUD(W, H, cx, u, matchSummary) {
+	// 1. Dark Vignette Overlay & Pulsing Crimson Border
+	uiDrawRectScreen(vec2(cx, H / 2), vec2(W, H), new Color(0.04, 0.01, 0.02, 0.88));
+	let pulseAlpha = 0.5 + 0.3 * Math.sin(frame / 8);
+	let borderCol = colorBlood.scale(pulseAlpha);
+	uiDrawRectScreen(vec2(cx, 3), vec2(W, 6), borderCol);
+	uiDrawRectScreen(vec2(cx, H - 3), vec2(W, 6), borderCol);
+	uiDrawRectScreen(vec2(3, H / 2), vec2(6, H), borderCol);
+	uiDrawRectScreen(vec2(W - 3, H / 2), vec2(6, H), borderCol);
+
+	// 2. Animated 'DEAD AGAIN' Header with Chromatic Drip & Pulse (D-06, D-40)
+	let headerPulse = 1.0 + 0.05 * Math.sin(frame / 20);
+	let headerY = H * 0.10;
+	let headerSize = u * 2.2 * headerPulse;
+	const headerText = "DEAD AGAIN";
+
+	// Chromatic drip offsets
+	drawTextWithOutline(headerText, vec2(cx - 3, headerY), headerSize, colorBlood);
+	drawTextWithOutline(headerText, vec2(cx + 3, headerY), headerSize, new Color(121 / 255, 33 / 255, 56 / 255));
+	drawTextWithOutline(headerText, vec2(cx, headerY), headerSize, colorWhite);
+
+	let subtext = "SURVIVAL TERMINATED — THE NIGHTMARE GAUNTLET PREVAILED";
+	drawTextWithOutline(subtext, vec2(cx, headerY + u * 1.3), u * 0.72, colorBlood);
+
+	// 3. Central Telemetry Card
+	let cardW = Math.min(W * 0.76, u * 28);
+	let cardH = H * 0.44;
+	let cardY = H * 0.48;
+	uiDrawRectScreen(vec2(cx, cardY), vec2(cardW + 4, cardH + 4), new Color(121 / 255, 33 / 255, 56 / 255, 0.8));
+	uiDrawRectScreen(vec2(cx, cardY), vec2(cardW, cardH), new Color(0.08, 0.02, 0.04, 0.95));
+
+	drawTextWithOutline("— NIGHTMARE SURVIVAL REPORT —", vec2(cx, cardY - cardH * 0.40), u * 0.85, colorSpark);
+
+	let waveNum = Math.max(1, (matchSummary.nightmareWave || (matchSummary.level - 5)));
+	let totalSec = Math.floor((typeof g_nightmareSurvivalFrames !== "undefined" ? g_nightmareSurvivalFrames : 0) / 60);
+	let mins = Math.floor(totalSec / 60);
+	let secs = totalSec % 60;
+	let clockStr = (mins < 10 ? "0" + mins : "" + mins) + ":" + (secs < 10 ? "0" + secs : "" + secs);
+
+	let bestW = (typeof getNightmareBestWave === "function") ? getNightmareBestWave() : parseInt(safeGetPref('da_nightmare_best_wave', '0'), 10) || 0;
+	let isRecord = waveNum >= bestW && waveNum > 0;
+
+	let row1 = "WAVES SURVIVED: " + (waveNum - 1) + "  |  TOTAL KILLS: " + (typeof g_score !== "undefined" ? g_score : 0);
+	drawTextWithOutline(row1, vec2(cx, cardY - cardH * 0.22), u * 0.78, colorWhite);
+
+	let row2 = "SURVIVAL TIME: " + clockStr + "  |  BEST RECORD: WAVE " + bestW;
+	drawTextWithOutline(row2, vec2(cx, cardY - cardH * 0.06), u * 0.75, colorBullet);
+
+	if (isRecord) {
+		drawTextWithOutline("★ NEW PERSONAL BEST RECORD! ★", vec2(cx, cardY + cardH * 0.10), u * 0.82, colorSpark);
+	}
+
+	let mvpBadName = matchSummary.mvpBad ? "@" + matchSummary.mvpBad.user : "None";
+	let mvpGoodName = matchSummary.mvpGood ? "@" + matchSummary.mvpGood.user : "None";
+	let row3 = "PUBLIC ENEMY: " + mvpBadName + "  |  GUARDIAN: " + mvpGoodName;
+	drawTextWithOutline(row3, vec2(cx, cardY + cardH * 0.26), u * 0.68, colorGrey);
+
+	if (matchSummary.causeOfDeath) {
+		drawTextWithOutline(matchSummary.causeOfDeath, vec2(cx, cardY + cardH * 0.38), u * 0.62, colorBlood);
+	}
+
+	// 4. Safe Lower-Center Bounds [0.35W, 0.65W] x [0.78H, 0.90H] Buttons (D-41, D-42)
+	let btnW = W * 0.30;
+	let btnH = H * 0.052;
+	let btn1Y = H * 0.805;
+	let btn2Y = H * 0.875;
+
+	let selIdx = typeof g_defeatSelectedButton !== "undefined" ? g_defeatSelectedButton : 0;
+
+	// Button 1: [ RESTART CAMPAIGN ]
+	let isBtn1Sel = (selIdx === 0);
+	uiDrawRectScreen(vec2(cx, btn1Y), vec2(btnW + 4, btnH + 4), isBtn1Sel ? colorSpark : new Color(0.2, 0.2, 0.2));
+	uiDrawRectScreen(vec2(cx, btn1Y), vec2(btnW, btnH), isBtn1Sel ? new Color(0.25, 0.05, 0.05, 0.95) : new Color(0.08, 0.08, 0.1, 0.9));
+	let btn1Text = (isBtn1Sel ? "► [ RESTART CAMPAIGN ]" : "[ RESTART CAMPAIGN ]");
+	drawTextWithOutline(btn1Text, vec2(cx, btn1Y), u * 0.75, isBtn1Sel ? colorSpark : colorWhite);
+
+	// Button 2: [ MAIN MENU ]
+	let isBtn2Sel = (selIdx === 1);
+	uiDrawRectScreen(vec2(cx, btn2Y), vec2(btnW + 4, btnH + 4), isBtn2Sel ? colorSpark : new Color(0.2, 0.2, 0.2));
+	uiDrawRectScreen(vec2(cx, btn2Y), vec2(btnW, btnH), isBtn2Sel ? new Color(0.25, 0.05, 0.05, 0.95) : new Color(0.08, 0.08, 0.1, 0.9));
+	let btn2Text = (isBtn2Sel ? "► [ MAIN MENU ]" : "[ MAIN MENU ]");
+	drawTextWithOutline(btn2Text, vec2(cx, btn2Y), u * 0.75, isBtn2Sel ? colorSpark : colorGrey);
+}
+
 function renderOutcomeHUD(inW, inH, inCx, inU) {
 	let matchSummary = typeof g_apgManager !== "undefined" && g_apgManager ? g_apgManager.matchSummary : null;
 	if (!matchSummary) return;
@@ -8504,6 +9428,13 @@ function renderOutcomeHUD(inW, inH, inCx, inU) {
 	const H = inH || (typeof mainCanvasSize !== "undefined" ? mainCanvasSize.y : typeof overlayCanvas !== "undefined" ? overlayCanvas.height : 600);
 	const cx = inCx || W / 2;
 	const u = inU || Math.max(12, Math.min(W, H) / 40);
+
+	// Check for Nightmare Defeat Screen (D-06, D-40, D-41, D-42)
+	let isNightmareDefeat = matchSummary.state === STATE_DEAD && ((typeof g_level !== "undefined" && g_level >= 5) || matchSummary.level > 5);
+	if (isNightmareDefeat) {
+		renderNightmareDefeatHUD(W, H, cx, u, matchSummary);
+		return;
+	}
 
 	// 1. Atmospheric Dark Vignette Overlay (D-18)
 	uiDrawRectScreen(vec2(cx, H / 2), vec2(W, H), new Color(0.04, 0.04, 0.06, 0.78));
@@ -8903,7 +9834,7 @@ function gameRenderPost() {
 
 			// Pause Card
 			const cardW = Math.min(W * 0.72, u * 26);
-			const cardH = H * 0.64;
+			const cardH = H * 0.72;
 			uiDrawRectScreen(vec2(cx, H * 0.5), vec2(cardW + 4, cardH + 4), colorWhite.scale(0.3));
 			uiDrawRectScreen(vec2(cx, H * 0.5), vec2(cardW, cardH), new Color(0.06, 0.06, 0.08, 0.95));
 
@@ -8966,10 +9897,35 @@ function gameRenderPost() {
 				}
 			}
 
+			// Button 4: [RESET HIGH SCORES] with two-click confirmation (D-49)
+			const resetY = H * 0.74;
+			const resetHover = Math.abs(mX - cx) < btnW / 2 && Math.abs(mY - resetY) < btnH / 2;
+			if (typeof g_resetHighScoreConfirmTimer !== "undefined" && g_resetHighScoreConfirmTimer > 0) {
+				g_resetHighScoreConfirmTimer--;
+			}
+			const isConfirming = (typeof g_resetHighScoreConfirmTimer !== "undefined" && g_resetHighScoreConfirmTimer > 0);
+			uiDrawRectScreen(vec2(cx, resetY), vec2(btnW, btnH), resetHover ? colorBlood.scale(0.5) : colorWhite.scale(0.12));
+			const resetText = isConfirming ? "⚠ CONFIRM RESET HIGH SCORES? ⚠" : "[ RESET HIGH SCORES ]";
+			drawTextWithOutline(resetText, vec2(cx, resetY), u * 0.72, isConfirming ? colorSpark : (resetHover ? colorBlood : colorWhite));
+			if (resetHover && mouseWasPressed(0)) {
+				uiSound(1);
+				if (isConfirming) {
+					if (typeof safeSetPref === 'function') {
+						safeSetPref('da_nightmare_best_wave', '0');
+						safeSetPref('da_nightmare_best_time', '0');
+						safeSetPref('da_high_score', '0');
+					}
+					try { if (typeof localStorage !== 'undefined') localStorage.da_t = 0; } catch (e) {}
+					g_resetHighScoreConfirmTimer = 0;
+				} else {
+					g_resetHighScoreConfirmTimer = 300; // 5s to confirm
+				}
+			}
+
 			// Desktop Streamer Dashboard Button (D-13)
 			const hasDesktopAPI = typeof window !== 'undefined' && (window.isDesktop || (window.electronAPI && window.electronAPI.openDashboard));
 			if (hasDesktopAPI) {
-				const dashY = H * 0.74;
+				const dashY = H * 0.80;
 
 				// Interactive button hover/click detection
 				const hovered = Math.abs(mX - cx) < btnW / 2 && Math.abs(mY - dashY) < btnH / 2;
@@ -8985,6 +9941,17 @@ function gameRenderPost() {
 				}
 			}
 		}
+	}
+
+	// Render Nightmare Top-Center Telemetry Plate (D-16)
+	let uPlate = Math.max(12, Math.min(mainCanvas.width, mainCanvas.height) / 40);
+	renderNightmareTelemetryPlate(mainCanvas.width, mainCanvas.height, uPlate);
+
+	// Render Personal Best Flare Banner (D-17)
+	if (typeof g_newPersonalBestBanner !== "undefined" && g_newPersonalBestBanner && g_newPersonalBestBanner.timer > 0) {
+		g_newPersonalBestBanner.timer--;
+		let bannerPulse = 1.0 + 0.08 * Math.sin(frame * 0.2);
+		drawTextWithOutline(g_newPersonalBestBanner.text, vec2(mainCanvas.width / 2, mainCanvas.height * 0.15), uPlate * 1.05 * bannerPulse, colorSpark);
 	}
 
 	textsDraw();

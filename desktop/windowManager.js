@@ -84,6 +84,11 @@ export class WindowManager {
     this.gameWindow.webContents.on('will-navigate', (event) => event.preventDefault());
     this.gameWindow.webContents.on('context-menu', (event) => event.preventDefault());
 
+    // OBS macOS Retina window capture scaling parity (D-67)
+    if (this.gameWindow.webContents.setVisualZoomLevelLimits) {
+      this.gameWindow.webContents.setVisualZoomLevelLimits(1, 1);
+    }
+
     this.gameWindow.loadURL(`http://127.0.0.1:${this.port}/`);
 
     this.gameWindow.on('close', () => {

@@ -1,9 +1,54 @@
 
+function playSoundOccluded(sound, pos, baseVol = 1, pitch = 1) {
+	if (!sound || typeof sound.play !== 'function') return;
+	if (!pos) {
+		sound.play(undefined, baseVol, pitch);
+		return;
+	}
+	let vol = baseVol;
+	// Distance attenuation & door/wall occlusion check (D-32)
+	if (typeof g_player !== 'undefined' && g_player && g_player.pos) {
+		let dist = pos.distance(g_player.pos);
+		let occluded = false;
+		if (typeof tileCollisionRaycast === 'function' && tileCollisionRaycast(g_player.pos, pos)) {
+			occluded = true;
+		}
+		if (!occluded && typeof g_doors !== 'undefined') {
+			for (let key in g_doors) {
+				let d = g_doors[key];
+				if (d && !d.broken) {
+					let doorPos = vec2(d.x + 0.5, d.y + 0.5);
+					if (g_player.pos.distance(doorPos) + pos.distance(doorPos) < dist + 0.4) {
+						occluded = true;
+						break;
+					}
+				}
+			}
+		}
+		if (occluded) {
+			vol *= 0.6; // -40% muffling (D-32)
+		}
+	}
+	sound.play(pos, vol, pitch);
+}
+
 function soundPlayExtra(sound, pos, vol, pitch, rand = 0, delay = 0, repeat = 1, initDelay=0) {
 	for (let i = 0; i < repeat; i++) { 
-		setTimeout( () => sound.play(pos, vol, pitch, rand), initDelay + delay * (i+1) )
+		setTimeout( () => {
+			if (typeof playSoundOccluded === 'function') {
+				playSoundOccluded(sound, pos, vol, pitch);
+			} else {
+				sound.play(pos, vol, pitch, rand);
+			}
+		}, initDelay + delay * (i+1) );
 	}
- }
+}
+
+/// Barricade Doors & Wave Stingers (D-10, D-29, D-31)
+var soundDoorBash = new Sound([1.4, 0.05, 95, 0.02, 0.08, 0.18, 4, 2.2, -4.5, 0, 40, 0.04, 0.06, 1.2, 0, 0.1, 0.05, 0.75, 0.08, 0]);
+var soundDoorBreak = new Sound([2.0, 0.05, 140, 0.03, 0.22, 0.38, 4, 3.1, -6, 0, -80, 0.06, 0.08, 1.8, -12, 0.2, 0.1, 0.85, 0.14, 0.2]);
+var soundWaveSurvival = soundOutcomeGood;
+var soundDefeatCrash = soundOutcomeBad;
 
 
 

@@ -110,3 +110,45 @@ function musicResume() {
 		source = music.play(vol);
 	}
 }
+
+var g_musicCurrentRate = 1.0;
+var g_musicDucked = false;
+
+function updateMusicDynamicScaling() {
+	if (!source) return;
+
+	// 1. Dynamic Tempo Escalation (+2 BPM per wave from 50 up to 70 max, D-28)
+	let waveNum = (typeof g_level !== "undefined" && g_level >= 5) ? (g_level - 4) : 0;
+	let targetBPM = Math.min(70, 50 + waveNum * 2);
+	let targetRate = targetBPM / 50;
+
+	if (source.playbackRate && typeof source.playbackRate.value === "number") {
+		source.playbackRate.value = targetRate;
+	}
+	g_musicCurrentRate = targetRate;
+
+	// 2. Dynamic Volume Ducking (-30% volume when <= 1 heart or >= 3 bosses, D-30)
+	let bossCount = (typeof g_enemies !== "undefined")
+		? g_enemies.filter(e => e && e.isAudienceBoss && e.hp > 0).length
+		: 0;
+	let isDanger = (typeof g_player !== "undefined" && g_player && g_player.hp <= 1) || bossCount >= 3;
+
+	if (isDanger !== g_musicDucked) {
+		g_musicDucked = isDanger;
+		if (music && typeof source.stop === 'function') {
+			try { source.stop(); } catch (e) {}
+			source = music.play(isDanger ? vol * 0.7 : vol);
+			if (source && source.playbackRate) {
+				source.playbackRate.value = targetRate;
+			}
+		}
+	}
+
+	// 3. Procedural Heartbeat Pulse at 1 HP (D-30)
+	if (typeof g_player !== "undefined" && g_player && g_player.hp === 1 && typeof g_state !== "undefined" && g_state === STATE_PLAYING) {
+		let cycle = (typeof frame !== "undefined" ? frame : 0) % 50;
+		if (cycle === 0 && typeof soundHeartbeat !== "undefined") {
+			soundHeartbeat.play();
+		}
+	}
+}
