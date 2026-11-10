@@ -95,6 +95,12 @@ class APGManager {
 		this.commandPulseFrames = {};
 		this.cheatSheetFlare = { color: null, frames: 0, maxFrames: 0 };
 
+		// Sabotage pacing & Karma clutch state (D-24, D-25, D-60, D-61, D-62)
+		this.blackoutGracePeriodFrames = 0;
+		this.jamImmunityFrames = 0;
+		this.karmaClutchCooldown = 0;
+		this.bloodEclipseDimFrames = 0;
+
 		// Register network listeners
 		if (typeof g_apgNetwork !== "undefined" && g_apgNetwork) {
 			var self = this;
@@ -151,6 +157,10 @@ class APGManager {
 		this.commandLastTriggered = {};
 		this.commandPulseFrames = {};
 		this.cheatSheetFlare = { color: null, frames: 0, maxFrames: 0 };
+		this.blackoutGracePeriodFrames = 0;
+		this.jamImmunityFrames = 0;
+		this.karmaClutchCooldown = 0;
+		this.bloodEclipseDimFrames = 0;
 		this.clearActiveEffects();
 	}
 
@@ -298,6 +308,9 @@ class APGManager {
 			this.runStats.badActions++;
 		}
 
+		// Check 100% Karma Clutch Events (D-60..D-63)
+		this.checkKarmaClutchEvents();
+
 		// Weighted impact scoring (D-21) & chronological tracking (D-23)
 		let pts = ACTION_IMPACT_WEIGHTS[action] || 1;
 		let now = Date.now();
@@ -380,6 +393,30 @@ class APGManager {
 				if (gMap[rawUser]) {
 					gMap[rawUser].score += 5;
 					gMap[rawUser].clutchSave = true;
+				}
+			}
+		}
+
+		// Sabotage pacing & concurrency caps (D-24, D-25, D-26, D-27)
+		if (team === "bad") {
+			let isMajorSabotage = (action === "boss" || action === "blackout" || action === "jam" || action === "frenzy");
+			if (isMajorSabotage && this.getActiveSabotageCount() >= 2) {
+				this.addToast("[BAD] Sabotage cap reached (max 2 active)!", "bad");
+				return;
+			}
+			if (action === "blackout" && (this.blackoutGracePeriodFrames > 0 || this.timers.blackout > 0)) {
+				this.addToast("[BAD] Darkness immune (12s grace period)!", "bad");
+				return;
+			}
+			if (action === "jam" && (this.jamImmunityFrames > 0 || (g_player && g_player.gun && g_player.gun.isJammed))) {
+				this.addToast("[BAD] Weapon immune (post-reload 10s)!", "bad");
+				return;
+			}
+			if (action === "boss") {
+				let livingBosses = (typeof g_enemies !== "undefined" ? g_enemies.filter(e => e && e.isAudienceBoss && e.hp > 0) : []);
+				if (livingBosses.length >= (typeof MAX_AUDIENCE_BOSSES !== "undefined" ? MAX_AUDIENCE_BOSSES : 5)) {
+					this.addToast("[BAD] Boss cap reached (5/5 active)!", "bad");
+					return;
 				}
 			}
 		}
@@ -666,7 +703,8 @@ class APGManager {
 		if (typeof uiflashScreen === "function") uiflashScreen("#fbf236", 12);
 		if (typeof fx_shakeScreen === "function") fx_shakeScreen(1.2);
 		if (typeof soundDivineFlash !== "undefined") {
-			soundDivineFlash.play(g_player ? g_player.pos : typeof cameraPos !== "undefined" ? cameraPos : vec2(0));
+			let soundPos = (typeof mainCanvas !== "undefined" && mainCanvas) ? (g_player ? g_player.pos : typeof cameraPos !== "undefined" ? cameraPos : undefined) : undefined;
+			soundDivineFlash.play(soundPos);
 		}
 
 		if (g_player) {
@@ -734,6 +772,76 @@ class APGManager {
 		}
 	}
 
+	checkKarmaClutchEvents() {
+		if (this.karmaClutchCooldown > 0) return;
+		let total = this.goodActions + this.badActions;
+		if (total < 3) return; // Minimum 3 actions required to establish ratio
+
+		let goodPct = Math.round((this.goodActions / total) * 100);
+
+		// D-60: 100% Good Karma (Holy Flash)
+		if (goodPct >= 100) {
+			this.triggerDivineFlash("KARMA_HOLY_FLASH", "Chat (100% Good)", false);
+			// Vaporize airborne boss boulders
+			if (typeof engineObjects !== "undefined") {
+				for (let i = 0; i < engineObjects.length; i++) {
+					let o = engineObjects[i];
+					if (o && (typeof Boulder !== "undefined" && o instanceof Boulder)) {
+						o.destroy();
+					}
+				}
+			}
+			if (typeof g_enemies !== "undefined") {
+				for (let i = 0; i < g_enemies.length; i++) {
+					let e = g_enemies[i];
+					if (e && e.boulder) {
+						e.boulder.destroy();
+						e.boulder = undefined;
+						e.throwing = false;
+					}
+				}
+			}
+			this.addWorldPopup("★ 100% GOOD KARMA: HOLY FLASH! ★", g_player ? g_player.pos.add(vec2(0, 1.2)) : vec2(0), colorSpark);
+			this.addToast("★ 100% GOOD KARMA: HOLY FLASH ACTIVATED! ★", "good");
+
+			// Recenter to 50/50 with 10s cooldown lock (D-62)
+			let half = Math.max(1, Math.round(total / 2));
+			this.goodActions = half;
+			this.badActions = half;
+			this.karmaClutchCooldown = 600; // 10 seconds
+		}
+		// D-61: 100% Bad Karma (Blood Eclipse)
+		else if (goodPct <= 0) {
+			// 8-second blood frenzy (+35% speed)
+			this.timers.slow = 0;
+			this.timers.frenzy = 480; // 8 seconds
+			this.bloodEclipseDimFrames = 480; // Dim arena lights to 30%
+
+			// Instantly spawn 1 bonus audience boss
+			let livingBosses = (typeof g_enemies !== "undefined" ? g_enemies.filter(e => e && e.isAudienceBoss && e.hp > 0) : []);
+			if (livingBosses.length < (typeof MAX_AUDIENCE_BOSSES !== "undefined" ? MAX_AUDIENCE_BOSSES : 5)) {
+				let bossPos = (typeof findFreePosRange === "function") ? findFreePosRange(5.5, 9.0, false) : (typeof findFreePos === "function" ? findFreePos(6) : vec2(0));
+				let boss = new BossZombie(bossPos, true, "Chat (100% Bad)");
+				boss.spawnTelegraphFrames = 54;
+				g_enemies.push(boss);
+				if (typeof g_transforms !== "undefined") {
+					g_transforms.push({ pos: bossPos.copy(), life: 54, tileIndex: tileNumbers_beefyZombie });
+				}
+			}
+
+			if (typeof soundBossSpawn !== "undefined") soundBossSpawn.play();
+			if (typeof fx_shakeScreen === "function") fx_shakeScreen(1.0);
+			this.addWorldPopup("☠ 100% BAD KARMA: BLOOD ECLIPSE! ☠", g_player ? g_player.pos.add(vec2(0, 1.2)) : vec2(0), colorBlood);
+			this.addToast("☠ 100% BAD KARMA: BLOOD ECLIPSE ACTIVATED! ☠", "bad");
+
+			// Recenter to 50/50 with 10s cooldown lock (D-62)
+			let half = Math.max(1, Math.round(total / 2));
+			this.goodActions = half;
+			this.badActions = half;
+			this.karmaClutchCooldown = 600; // 10 seconds
+		}
+	}
+
 	triggerCheatSheetFlare(col, frames = 30) {
 		this.cheatSheetFlare = { color: col, frames: frames, maxFrames: frames };
 	}
@@ -798,9 +906,18 @@ class APGManager {
 		this.displayedGoodPct += (targetPct - this.displayedGoodPct) * 0.12;
 
 		// Decrement timers
+		let hadBlackout = this.timers.blackout > 0;
 		for (let t in this.timers) {
 			if (this.timers[t] > 0) this.timers[t]--;
 		}
+		if (hadBlackout && this.timers.blackout <= 0) {
+			this.blackoutGracePeriodFrames = 720; // 12-second grace period after blackout ends (D-24)
+		}
+
+		if (this.blackoutGracePeriodFrames > 0) this.blackoutGracePeriodFrames--;
+		if (this.jamImmunityFrames > 0) this.jamImmunityFrames--;
+		if (this.karmaClutchCooldown > 0) this.karmaClutchCooldown--;
+		if (this.bloodEclipseDimFrames > 0) this.bloodEclipseDimFrames--;
 
 		if (this.divineFlashCooldown > 0) {
 			this.divineFlashCooldown--;
@@ -1191,7 +1308,8 @@ class APGManager {
 		}
 
 		let curLevel = typeof g_level !== "undefined" ? g_level : 0;
-		let isGrandVictory = Boolean(newState === STATE_CLEARED && curLevel >= 4);
+		let isGrandVictory = false; // Endless post-Level 5 Nightmare Gauntlet replaces grand victory termination (D-01)
+		let isNightmare = curLevel >= 5;
 
 		if (newState === STATE_CLEARED) {
 			this.runStats.levelsCleared++;
@@ -1222,6 +1340,8 @@ class APGManager {
 			winner: winner,
 			reason: reason,
 			isGrandVictory: isGrandVictory,
+			isNightmare: isNightmare,
+			nightmareWave: isNightmare ? (curLevel - 4) : 0,
 			goodActions: this.goodActions,
 			badActions: this.badActions,
 			totalActions: total,
@@ -1487,8 +1607,23 @@ class APGManager {
 		let barY = Math.round(H - Math.max(24, u * 1.5));
 		let barW = Math.min(W * 0.42, u * 21);
 		let barH = Math.max(16, u * 1.15);
+
+		// D-63: Rapid pulse and flashing chevron edge indicators when Karma exceeds 80%
+		let isDangerRatio = (liveGoodPct >= 80 || liveBadPct >= 80);
+		let dangerPulse = isDangerRatio ? (1.0 + 0.08 * Math.sin(frame * 0.3)) : 1.0;
+		barH = barH * dangerPulse;
+
 		let barLeft = cx - barW / 2;
 		let barRight = cx + barW / 2;
+
+		if (isDangerRatio) {
+			let flashAlpha = (0.5 + 0.5 * Math.sin(frame * 0.4)) * meterAlpha;
+			if (liveGoodPct >= 80) {
+				drawTextWithOutline("<<< <<<", vec2(barLeft - u * 2.8, barY), u * 0.72, colorSpark.scale(flashAlpha), 2, new Color(0, 0, 0, flashAlpha));
+			} else {
+				drawTextWithOutline(">>> >>>", vec2(barRight + u * 2.8, barY), u * 0.72, colorBlood.scale(flashAlpha), 2, new Color(0, 0, 0, flashAlpha));
+			}
+		}
 
 		// Outer frame & background track
 		uiDrawRectScreen(vec2(cx, barY), vec2(barW + 4, barH + 4), colorWhite.scale(0.35 * meterAlpha));

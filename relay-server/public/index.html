@@ -17,6 +17,7 @@
       </div>
       <div class="header-status-block">
         <div id="update-notification-pill" class="update-pill hidden">★ UPDATE AVAILABLE: <span id="update-pill-version"></span> ★ <button id="update-pill-dismiss" class="pill-dismiss">×</button></div>
+        <span id="nightmare-status-badge" class="meta-badge nightmare-badge hidden">NIGHTMARE GAUNTLET - WAVE 1</span>
         <span id="ws-status-badge" class="status-badge disconnected">● DISCONNECTED</span>
         <span id="channel-badge" class="meta-badge">CHANNEL: #none</span>
         <a id="kofi-header-btn" class="header-btn bmc-kofi-btn" href="https://ko-fi.com/baiz1d" target="_blank" rel="noopener">☕ Buy Me A Coffee!</a>
@@ -117,6 +118,13 @@
             <button type="button" id="lock-prediction-btn" class="btn btn-secondary">
               LOCK VOTES &amp; START NOW
             </button>
+          </div>
+
+          <div id="nightmare-boss-panel" class="nightmare-boss-panel hidden">
+            <div class="nightmare-boss-header">
+              <span class="boss-title">NIGHTMARE GAUNTLET - ACTIVE AUDIENCE BOSSES (<span id="nightmare-boss-count">0</span>/5)</span>
+            </div>
+            <div id="nightmare-boss-list" class="nightmare-boss-grid"></div>
           </div>
         </div>
       </section>

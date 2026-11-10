@@ -1133,6 +1133,40 @@ function renderStartScreenBadges(cx, H, u, safeW) {
         drawTextWithOutline(`PREVIOUS SCORE: ${g_score}  ★  HIGH SCORE: ${topScore}`, vec2(cx, scoreY), Math.max(11, u * 0.60), colorSpark);
     }
 
+    // 16-Bit Retro Arcade Record Plaque (D-18)
+    const plaqueY = (typeof g_score !== 'undefined' && g_score > 0) ? H * 0.49 : H * 0.53;
+    const plaqueW = Math.min(safeW * 0.72, u * 22);
+    const plaqueH = u * 1.5;
+
+    overlayContext.save();
+    overlayContext.fillStyle = 'rgba(18, 14, 24, 0.90)';
+    overlayContext.fillRect(cx - plaqueW / 2, plaqueY - plaqueH / 2, plaqueW, plaqueH);
+    overlayContext.strokeStyle = '#792138';
+    overlayContext.lineWidth = 1.4;
+    overlayContext.strokeRect(cx - plaqueW / 2, plaqueY - plaqueH / 2, plaqueW, plaqueH);
+
+    // Corner rivets in gold
+    overlayContext.fillStyle = '#D4AF37';
+    overlayContext.fillRect(cx - plaqueW / 2 + 3, plaqueY - plaqueH / 2 + 3, 3, 3);
+    overlayContext.fillRect(cx + plaqueW / 2 - 6, plaqueY - plaqueH / 2 + 3, 3, 3);
+    overlayContext.fillRect(cx - plaqueW / 2 + 3, plaqueY + plaqueH / 2 - 6, 3, 3);
+    overlayContext.fillRect(cx + plaqueW / 2 - 6, plaqueY + plaqueH / 2 - 6, 3, 3);
+
+    let bestWave = typeof getNightmareBestWave === "function" ? getNightmareBestWave() : parseInt(safeGetPref('da_nightmare_best_wave', '0'), 10) || 0;
+    let bestTime = typeof getNightmareBestTime === "function" ? getNightmareBestTime() : parseInt(safeGetPref('da_nightmare_best_time', '0'), 10) || 0;
+    let plaqueStr = "";
+    if (bestWave > 0) {
+        let mins = Math.floor(bestTime / 60);
+        let secs = bestTime % 60;
+        let timeStr = (mins < 10 ? "0" + mins : "" + mins) + ":" + (secs < 10 ? "0" + secs : "" + secs);
+        plaqueStr = "BEST SURVIVAL: WAVE " + bestWave + " - " + timeStr;
+    } else {
+        plaqueStr = "BEST SURVIVAL: WAVE -- - --:--";
+    }
+
+    drawTextWithOutline(plaqueStr, vec2(cx, plaqueY), Math.max(11, u * 0.58), colorSpark);
+    overlayContext.restore();
+
     // 1. All-Time Records Trophy Ledger Plate (D-08)
     const ledgerY = H * 0.60;
     const ledgerW = Math.min(safeW * 0.88, u * 28);

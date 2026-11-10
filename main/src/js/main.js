@@ -20,6 +20,38 @@ function safeSetPref(key, value) {
 	} catch (e) {}
 }
 
+function getNightmareBestWave() {
+	let val = parseInt(safeGetPref('da_nightmare_best_wave', '0'), 10);
+	if (isNaN(val) || val < 0) {
+		safeSetPref('da_nightmare_best_wave', '0');
+		return 0;
+	}
+	return val;
+}
+
+function getNightmareBestTime() {
+	let val = parseInt(safeGetPref('da_nightmare_best_time', '0'), 10);
+	if (isNaN(val) || val < 0) {
+		safeSetPref('da_nightmare_best_time', '0');
+		return 0;
+	}
+	return val;
+}
+
+function setNightmareBestWave(w) {
+	safeSetPref('da_nightmare_best_wave', Math.max(0, parseInt(w, 10) || 0));
+}
+
+function setNightmareBestTime(t) {
+	safeSetPref('da_nightmare_best_time', Math.max(0, parseInt(t, 10) || 0));
+}
+
+var g_nightmareSurvivalFrames = 0;
+var g_newPersonalBestBanner = null; // { text: "...", timer: 180 }
+var g_defeatSelectedButton = 0; // 0: Restart Campaign, 1: Main Menu
+var g_resetHighScoreConfirmTimer = 0;
+var g_nightmareTransitionTimer = 0;
+
 var g_cheatsheetVisible = safeGetPref('da_cheatsheet_visible', '1') === '1'; // D-06
 var g_cheatsheetDock = safeGetPref('da_cheatsheet_dock', 'right'); // 'right' or 'left', D-10
 var g_cheatsheetSlideProgress = g_cheatsheetVisible ? 1.0 : 0.0; // D-08
@@ -163,7 +195,8 @@ function enterLobbyState() {
 	changeState(STATE_LOBBY);
 
 	if (typeof g_apgNetwork !== "undefined") {
-		g_apgNetwork.startPrediction(g_level + 1);
+		let predDuration = (g_level >= 5) ? 15 : 60;
+		g_apgNetwork.startPrediction(g_level + 1, predDuration);
 	}
 }
 
@@ -551,9 +584,10 @@ function updateStateOutcome() {
 	let isMidRunClear = matchSummary && matchSummary.state === STATE_CLEARED && !matchSummary.isGrandVictory;
 
 	if (isMidRunClear) {
-		// 6-second countdown bar for mid-run level clear (D-30)
+		// 6-second countdown bar for mid-run level clear (D-30), 4-second tally banner for Nightmare wave clear (D-04)
+		let maxTallySec = (typeof g_level !== "undefined" && g_level >= 5) ? 4 : 6;
 		let elapsedSec = Math.floor(getMsSinceStateChange() / 1000);
-		let remainingSec = Math.max(0, 6 - elapsedSec);
+		let remainingSec = Math.max(0, maxTallySec - elapsedSec);
 
 		if (remainingSec <= 0 || mouseWasPressed(0) || keyWasPressed(32) || gamepadWasPressed(0)) {
 			uiSound(3);
@@ -563,19 +597,72 @@ function updateStateOutcome() {
 			});
 		}
 	} else {
-		// Game Over or Level 5 Grand Victory pauses indefinitely (D-30)
-		if (mouseWasPressed(0) || keyWasPressed(32) || gamepadWasPressed(0)) {
-			uiSound();
-			uiFadeOutAndCall(() => {
-				startNewGame();
-				enterLobbyState();
-			});
-		} else if (keyWasPressed(27)) {
-			// ESC key returns to Title Screen (D-20)
-			uiFadeOutAndCall(() => {
-				startNewGame();
-				changeState(STATE_CLICK_TO_START);
-			});
+		// Defeat / Outcome screen
+		let isNightmareDefeat = (typeof g_level !== "undefined" && g_level >= 5) || (matchSummary && matchSummary.level > 5);
+		if (isNightmareDefeat) {
+			// Defeat screen keyboard / gamepad navigation (D-41, D-42)
+			if (keyWasPressed(87) || keyWasPressed(38) || gamepadWasPressed(12)) {
+				g_defeatSelectedButton = 0; // [RESTART CAMPAIGN]
+				uiSound(1);
+			}
+			if (keyWasPressed(83) || keyWasPressed(40) || gamepadWasPressed(13)) {
+				g_defeatSelectedButton = 1; // [MAIN MENU]
+				uiSound(1);
+			}
+
+			// Safe lower-center bounds [0.35W, 0.65W] x [0.78H, 0.90H]
+			let W = typeof mainCanvas !== "undefined" ? mainCanvas.width : 800;
+			let H = typeof mainCanvas !== "undefined" ? mainCanvas.height : 600;
+			let mX = (typeof mousePosScreen !== 'undefined' && mousePosScreen) ? mousePosScreen.x : -1;
+			let mY = (typeof mousePosScreen !== 'undefined' && mousePosScreen) ? mousePosScreen.y : -1;
+			let btnW = W * 0.30;
+			let btnH = H * 0.055;
+			let btn1Y = H * 0.81;
+			let btn2Y = H * 0.87;
+
+			let hoverBtn1 = Math.abs(mX - W * 0.5) < btnW / 2 && Math.abs(mY - btn1Y) < btnH / 2;
+			let hoverBtn2 = Math.abs(mX - W * 0.5) < btnW / 2 && Math.abs(mY - btn2Y) < btnH / 2;
+
+			if (hoverBtn1 && mouseWasPressed(0)) {
+				g_defeatSelectedButton = 0;
+			} else if (hoverBtn2 && mouseWasPressed(0)) {
+				g_defeatSelectedButton = 1;
+			}
+
+			let activate = keyWasPressed(13) || keyWasPressed(32) || gamepadWasPressed(0) || (mouseWasPressed(0) && (hoverBtn1 || hoverBtn2));
+			if (activate) {
+				uiSound();
+				if (g_defeatSelectedButton === 0) {
+					// [RESTART CAMPAIGN] - resets g_level = 0, enforcing campaign climb integrity (D-38, D-39)
+					uiFadeOutAndCall(() => {
+						g_level = 0;
+						startNewGame();
+						enterLobbyState();
+					});
+				} else {
+					// [MAIN MENU] - returns to Start Screen
+					uiFadeOutAndCall(() => {
+						g_level = 0;
+						startNewGame();
+						changeState(STATE_CLICK_TO_START);
+					});
+				}
+			}
+		} else {
+			// Campaign Game Over pauses indefinitely (D-30)
+			if (mouseWasPressed(0) || keyWasPressed(32) || gamepadWasPressed(0)) {
+				uiSound();
+				uiFadeOutAndCall(() => {
+					startNewGame();
+					enterLobbyState();
+				});
+			} else if (keyWasPressed(27)) {
+				// ESC key returns to Title Screen (D-20)
+				uiFadeOutAndCall(() => {
+					startNewGame();
+					changeState(STATE_CLICK_TO_START);
+				});
+			}
 		}
 	}
 }
@@ -624,6 +711,9 @@ function updateStatePlaying() {
 	if (rand() < 0.1) pushers.push(new Pusher(g_player.pos, -0.001, 0, 5, rand(5), PushTo.ENEMIES));
 
 	updatePushers();
+	if (typeof g_level !== "undefined" && g_level >= 5) {
+		g_nightmareSurvivalFrames++;
+	}
 	if (typeof g_apgManager !== "undefined" && g_apgManager) g_apgManager.update();
 
 	textMiddle = getMsSinceStateChange() > 3000 ? "" : "Level " + (g_level + 1);
@@ -655,9 +745,42 @@ function updateStatePlaying() {
 	if (enemiesSpawned >= enemiesToSpawn && g_enemies.length <= 0) levelCleared = true;
 
 	if (levelCleared) {
+		if (g_level === 4) {
+			// Level 5 Boss clear transition into Endless Nightmare Gauntlet (D-01, D-05)
+			levelCleared = false;
+			if (typeof soundDivineFlash !== "undefined") soundDivineFlash.play();
+			if (typeof uiflashScreen === "function") uiflashScreen("#fbf236", 30);
+			if (g_player) g_player.hp = 3;
+			if (typeof g_savedEquipment !== "undefined" && g_savedEquipment) g_savedEquipment.playerHp = 3;
+			g_level = 5;
+			g_nightmareSurvivalFrames = 0;
+			uiFadeOutAndCall(() => {
+				enterLobbyState();
+			});
+			return;
+		}
+
+		if (g_level >= 5) {
+			// Immediately update persistent high score on wave completion (D-50)
+			let curWave = g_level - 4;
+			let bestW = getNightmareBestWave();
+			if (curWave > bestW) {
+				setNightmareBestWave(curWave);
+				let curTimeSec = Math.floor(g_nightmareSurvivalFrames / 60);
+				let bestT = getNightmareBestTime();
+				if (curTimeSec > bestT) {
+					setNightmareBestTime(curTimeSec);
+				}
+				g_newPersonalBestBanner = {
+					text: "★ NEW PERSONAL BEST WAVE " + curWave + "! ★",
+					timer: 180
+				};
+				if (typeof soundOutcomeGood !== "undefined") soundOutcomeGood.play();
+			}
+		}
+
 		changeState(STATE_CLEARED);
 		g_player.gun.reload();
-		//g_level++;
 		soundPlayExtra(soundLevelCleared, cameraPos, 2, 0.8, 0, 1000);
 		return;
 	}
@@ -669,7 +792,13 @@ function updateStatePlaying() {
 
 	if (g_player.hp <= 0) {
 		changeState(STATE_DEAD);
-		localStorage.da_t = max(g_score, localStorage.da_t || 0);
+		let curBestScore = parseInt(safeGetPref('da_high_score', '0'), 10) || 0;
+		if (g_score > curBestScore) {
+			safeSetPref('da_high_score', g_score);
+		}
+		try {
+			if (typeof localStorage !== 'undefined') localStorage.da_t = max(g_score, localStorage.da_t || 0);
+		} catch (e) {}
 		return;
 	}
 

@@ -90,6 +90,50 @@ function uiDrawHeartPipWorld(worldPos, scale, stateType) {
 	}
 }
 
+function drawPixelSkull(ctx, cx, cy, size, pulseAlpha, mirror = false) {
+	if (!ctx) return;
+	ctx.save();
+	ctx.translate(cx, cy);
+	if (mirror) ctx.scale(-1, 1);
+	let ps = size / 12;
+	let ox = -size / 2;
+	let oy = -size / 2;
+
+	const skullRows = [
+		"   XXXXXX   ",
+		"  XXXXXXXX  ",
+		" XXXXXXXXXX ",
+		" XXXXXXXXXX ",
+		" XXX..XX..XX",
+		" XXX..XX..XX",
+		"  XXXXXXXX  ",
+		"   XXXXXX   ",
+		"   XX..XX   ",
+		"   XXXXXX   ",
+		"   X.XX.X   ",
+		"   XXXXXX   "
+	];
+
+	ctx.fillStyle = "#E0E0E0";
+	for (let r = 0; r < 12; r++) {
+		let row = skullRows[r];
+		for (let c = 0; c < 12; c++) {
+			if (row[c] === 'X') {
+				ctx.fillRect(ox + c * ps, oy + r * ps, ps + 0.5, ps + 0.5);
+			}
+		}
+	}
+
+	let eyeAlpha = Math.max(0.2, Math.min(1.0, pulseAlpha));
+	ctx.fillStyle = `rgba(255, 30, 30, ${eyeAlpha.toFixed(2)})`;
+	ctx.shadowColor = "#FF0000";
+	ctx.shadowBlur = 6;
+	ctx.fillRect(ox + 3 * ps, oy + 4 * ps, 2 * ps, 2 * ps);
+	ctx.fillRect(ox + 7 * ps, oy + 4 * ps, 2 * ps, 2 * ps);
+	ctx.shadowBlur = 0;
+	ctx.restore();
+}
+
 function renderLobbyHUD() {
 	let pred =
 		typeof g_apgNetwork !== "undefined" && g_apgNetwork.prediction
@@ -120,21 +164,42 @@ function renderLobbyHUD() {
 	uiDrawRectScreen(vec2(cx, H * 0.52), vec2(cardW + 4, cardH + 4), colorWhite.scale(0.25));
 	uiDrawRectScreen(vec2(cx, H * 0.52), vec2(cardW, cardH), new Color(0.05, 0.05, 0.07, 0.86));
 
-	// 2. Flickering Blood-Red Header (D-21, D-22, CLIP-05)
-	const headerText = "LEVEL " + (g_level + 1) + ": WILL CHAT BE GOOD OR BAD?";
+	// 2. Header: Nightmare Wave or Campaign Level (D-03, D-21, D-22, CLIP-05)
+	let isNightmareLobby = (typeof g_level !== "undefined" && g_level >= 5);
+	let headerText = isNightmareLobby
+		? "NIGHTMARE WAVE " + (g_level - 4) + ": Will streamer survive?"
+		: "LEVEL " + (g_level + 1) + ": WILL CHAT BE GOOD OR BAD?";
 	const baseHeaderSize = Math.min(u * 1.45, W / 24);
 	const headerFontScale = Math.min(1.0, (cardW - u * 1.6) / Math.max(1, headerText.length * (baseHeaderSize * 0.60)));
 	const headerSize = baseHeaderSize * headerFontScale;
-	let flicker = (1.5 + Math.sin(frame / 50)) * 0.005;
-	for (let i = 0; i < 10; i++) {
-		drawTextScreen(
-			headerText,
-			vec2(rand(1 - flicker, 1 + flicker) * cx, rand(1 - flicker, 1 + flicker) * (H * 0.17)),
-			headerSize,
-			colorBlack.lerp(colorBlood, i / 10)
-		);
+
+	if (isNightmareLobby) {
+		let bannerW = Math.min(cardW - u * 2, headerText.length * (headerSize * 0.58) + u * 6);
+		let bannerH = headerSize * 1.8;
+		let bannerY = H * 0.17;
+		uiDrawRectScreen(vec2(cx, bannerY), vec2(bannerW + 6, bannerH + 6), new Color(121 / 255, 33 / 255, 56 / 255, 0.95));
+		uiDrawRectScreen(vec2(cx, bannerY), vec2(bannerW, bannerH), new Color(86 / 255, 0 / 255, 57 / 255, 0.95));
+
+		drawTextWithOutline(headerText, vec2(cx, bannerY), headerSize, colorWhite);
+
+		let pulseAlpha = 0.5 + 0.5 * Math.sin(frame / 10);
+		let skullSize = Math.min(u * 2.2, bannerH * 0.75);
+		let skullLeftX = cx - bannerW * 0.45;
+		let skullRightX = cx + bannerW * 0.45;
+		drawPixelSkull(overlayContext, skullLeftX, bannerY, skullSize, pulseAlpha, false);
+		drawPixelSkull(overlayContext, skullRightX, bannerY, skullSize, pulseAlpha, true);
+	} else {
+		let flicker = (1.5 + Math.sin(frame / 50)) * 0.005;
+		for (let i = 0; i < 10; i++) {
+			drawTextScreen(
+				headerText,
+				vec2(rand(1 - flicker, 1 + flicker) * cx, rand(1 - flicker, 1 + flicker) * (H * 0.17)),
+				headerSize,
+				colorBlack.lerp(colorBlood, i / 10)
+			);
+		}
+		drawTextWithOutline(headerText, vec2(cx, H * 0.17), headerSize, colorBlood);
 	}
-	drawTextWithOutline(headerText, vec2(cx, H * 0.17), headerSize, colorBlood);
 
 	// 3. Poll Mode Subtitle Pill (D-22)
 	const isHelix = pred.mode === "helix";
@@ -247,6 +312,139 @@ function renderLobbyHUD() {
 	drawTextWithOutline(promptText, vec2(cx, H * 0.88), u * 0.78 * promptFontScale, colorSpark.scale(promptAlpha));
 }
 
+function renderNightmareTelemetryPlate(W, H, u) {
+	if (typeof g_level === "undefined" || g_level < 5 || (typeof g_state !== "undefined" && g_state !== STATE_PLAYING)) return;
+	if (typeof overlayContext === "undefined" || !overlayContext) return;
+
+	overlayContext.save();
+	let plateX = W * 0.38;
+	let plateW = W * 0.24;
+	let plateY = H * 0.02;
+	let plateH = H * 0.06;
+
+	overlayContext.fillStyle = "rgba(30, 0, 10, 0.85)";
+	overlayContext.fillRect(plateX, plateY, plateW, plateH);
+	overlayContext.strokeStyle = "#792138";
+	overlayContext.lineWidth = 1.6;
+	overlayContext.strokeRect(plateX, plateY, plateW, plateH);
+
+	let curWave = g_level - 4;
+	let waveText = "NIGHTMARE WAVE " + curWave;
+
+	let totalSec = Math.floor((typeof g_nightmareSurvivalFrames !== "undefined" ? g_nightmareSurvivalFrames : 0) / 60);
+	let mins = Math.floor(totalSec / 60);
+	let secs = totalSec % 60;
+	let clockText = (mins < 10 ? "0" + mins : "" + mins) + ":" + (secs < 10 ? "0" + secs : "" + secs);
+
+	let mobAlive = typeof g_enemies !== "undefined" ? g_enemies.length : 0;
+	let mobCap = typeof getMaxActiveMobs === "function" ? getMaxActiveMobs(g_level) : 40;
+	let mobText = "MOBS: " + mobAlive + "/" + mobCap;
+
+	let textY = plateY + plateH * 0.62;
+	let fontSize = Math.max(10, Math.min(u * 0.62, plateH * 0.42));
+
+	overlayContext.font = "bold " + fontSize + "px " + fontDefault;
+	overlayContext.textBaseline = "middle";
+
+	overlayContext.textAlign = "left";
+	overlayContext.fillStyle = "#FBF236";
+	overlayContext.fillText(waveText, plateX + 10, textY);
+
+	overlayContext.textAlign = "center";
+	overlayContext.fillStyle = "#FFFFFF";
+	overlayContext.fillText(clockText, plateX + plateW * 0.52, textY);
+
+	overlayContext.textAlign = "right";
+	overlayContext.fillStyle = mobAlive >= mobCap ? "#AC3232" : "#999999";
+	overlayContext.fillText(mobText, plateX + plateW - 10, textY);
+
+	overlayContext.restore();
+}
+
+function renderNightmareDefeatHUD(W, H, cx, u, matchSummary) {
+	// 1. Dark Vignette Overlay & Pulsing Crimson Border
+	uiDrawRectScreen(vec2(cx, H / 2), vec2(W, H), new Color(0.04, 0.01, 0.02, 0.88));
+	let pulseAlpha = 0.5 + 0.3 * Math.sin(frame / 8);
+	let borderCol = colorBlood.scale(pulseAlpha);
+	uiDrawRectScreen(vec2(cx, 3), vec2(W, 6), borderCol);
+	uiDrawRectScreen(vec2(cx, H - 3), vec2(W, 6), borderCol);
+	uiDrawRectScreen(vec2(3, H / 2), vec2(6, H), borderCol);
+	uiDrawRectScreen(vec2(W - 3, H / 2), vec2(6, H), borderCol);
+
+	// 2. Animated 'DEAD AGAIN' Header with Chromatic Drip & Pulse (D-06, D-40)
+	let headerPulse = 1.0 + 0.05 * Math.sin(frame / 20);
+	let headerY = H * 0.10;
+	let headerSize = u * 2.2 * headerPulse;
+	const headerText = "DEAD AGAIN";
+
+	// Chromatic drip offsets
+	drawTextWithOutline(headerText, vec2(cx - 3, headerY), headerSize, colorBlood);
+	drawTextWithOutline(headerText, vec2(cx + 3, headerY), headerSize, new Color(121 / 255, 33 / 255, 56 / 255));
+	drawTextWithOutline(headerText, vec2(cx, headerY), headerSize, colorWhite);
+
+	let subtext = "SURVIVAL TERMINATED — THE NIGHTMARE GAUNTLET PREVAILED";
+	drawTextWithOutline(subtext, vec2(cx, headerY + u * 1.3), u * 0.72, colorBlood);
+
+	// 3. Central Telemetry Card
+	let cardW = Math.min(W * 0.76, u * 28);
+	let cardH = H * 0.44;
+	let cardY = H * 0.48;
+	uiDrawRectScreen(vec2(cx, cardY), vec2(cardW + 4, cardH + 4), new Color(121 / 255, 33 / 255, 56 / 255, 0.8));
+	uiDrawRectScreen(vec2(cx, cardY), vec2(cardW, cardH), new Color(0.08, 0.02, 0.04, 0.95));
+
+	drawTextWithOutline("— NIGHTMARE SURVIVAL REPORT —", vec2(cx, cardY - cardH * 0.40), u * 0.85, colorSpark);
+
+	let waveNum = Math.max(1, (matchSummary.nightmareWave || (matchSummary.level - 5)));
+	let totalSec = Math.floor((typeof g_nightmareSurvivalFrames !== "undefined" ? g_nightmareSurvivalFrames : 0) / 60);
+	let mins = Math.floor(totalSec / 60);
+	let secs = totalSec % 60;
+	let clockStr = (mins < 10 ? "0" + mins : "" + mins) + ":" + (secs < 10 ? "0" + secs : "" + secs);
+
+	let bestW = (typeof getNightmareBestWave === "function") ? getNightmareBestWave() : parseInt(safeGetPref('da_nightmare_best_wave', '0'), 10) || 0;
+	let isRecord = waveNum >= bestW && waveNum > 0;
+
+	let row1 = "WAVES SURVIVED: " + (waveNum - 1) + "  |  TOTAL KILLS: " + (typeof g_score !== "undefined" ? g_score : 0);
+	drawTextWithOutline(row1, vec2(cx, cardY - cardH * 0.22), u * 0.78, colorWhite);
+
+	let row2 = "SURVIVAL TIME: " + clockStr + "  |  BEST RECORD: WAVE " + bestW;
+	drawTextWithOutline(row2, vec2(cx, cardY - cardH * 0.06), u * 0.75, colorBullet);
+
+	if (isRecord) {
+		drawTextWithOutline("★ NEW PERSONAL BEST RECORD! ★", vec2(cx, cardY + cardH * 0.10), u * 0.82, colorSpark);
+	}
+
+	let mvpBadName = matchSummary.mvpBad ? "@" + matchSummary.mvpBad.user : "None";
+	let mvpGoodName = matchSummary.mvpGood ? "@" + matchSummary.mvpGood.user : "None";
+	let row3 = "PUBLIC ENEMY: " + mvpBadName + "  |  GUARDIAN: " + mvpGoodName;
+	drawTextWithOutline(row3, vec2(cx, cardY + cardH * 0.26), u * 0.68, colorGrey);
+
+	if (matchSummary.causeOfDeath) {
+		drawTextWithOutline(matchSummary.causeOfDeath, vec2(cx, cardY + cardH * 0.38), u * 0.62, colorBlood);
+	}
+
+	// 4. Safe Lower-Center Bounds [0.35W, 0.65W] x [0.78H, 0.90H] Buttons (D-41, D-42)
+	let btnW = W * 0.30;
+	let btnH = H * 0.052;
+	let btn1Y = H * 0.805;
+	let btn2Y = H * 0.875;
+
+	let selIdx = typeof g_defeatSelectedButton !== "undefined" ? g_defeatSelectedButton : 0;
+
+	// Button 1: [ RESTART CAMPAIGN ]
+	let isBtn1Sel = (selIdx === 0);
+	uiDrawRectScreen(vec2(cx, btn1Y), vec2(btnW + 4, btnH + 4), isBtn1Sel ? colorSpark : new Color(0.2, 0.2, 0.2));
+	uiDrawRectScreen(vec2(cx, btn1Y), vec2(btnW, btnH), isBtn1Sel ? new Color(0.25, 0.05, 0.05, 0.95) : new Color(0.08, 0.08, 0.1, 0.9));
+	let btn1Text = (isBtn1Sel ? "► [ RESTART CAMPAIGN ]" : "[ RESTART CAMPAIGN ]");
+	drawTextWithOutline(btn1Text, vec2(cx, btn1Y), u * 0.75, isBtn1Sel ? colorSpark : colorWhite);
+
+	// Button 2: [ MAIN MENU ]
+	let isBtn2Sel = (selIdx === 1);
+	uiDrawRectScreen(vec2(cx, btn2Y), vec2(btnW + 4, btnH + 4), isBtn2Sel ? colorSpark : new Color(0.2, 0.2, 0.2));
+	uiDrawRectScreen(vec2(cx, btn2Y), vec2(btnW, btnH), isBtn2Sel ? new Color(0.25, 0.05, 0.05, 0.95) : new Color(0.08, 0.08, 0.1, 0.9));
+	let btn2Text = (isBtn2Sel ? "► [ MAIN MENU ]" : "[ MAIN MENU ]");
+	drawTextWithOutline(btn2Text, vec2(cx, btn2Y), u * 0.75, isBtn2Sel ? colorSpark : colorGrey);
+}
+
 function renderOutcomeHUD(inW, inH, inCx, inU) {
 	let matchSummary = typeof g_apgManager !== "undefined" && g_apgManager ? g_apgManager.matchSummary : null;
 	if (!matchSummary) return;
@@ -255,6 +453,13 @@ function renderOutcomeHUD(inW, inH, inCx, inU) {
 	const H = inH || (typeof mainCanvasSize !== "undefined" ? mainCanvasSize.y : typeof overlayCanvas !== "undefined" ? overlayCanvas.height : 600);
 	const cx = inCx || W / 2;
 	const u = inU || Math.max(12, Math.min(W, H) / 40);
+
+	// Check for Nightmare Defeat Screen (D-06, D-40, D-41, D-42)
+	let isNightmareDefeat = matchSummary.state === STATE_DEAD && ((typeof g_level !== "undefined" && g_level >= 5) || matchSummary.level > 5);
+	if (isNightmareDefeat) {
+		renderNightmareDefeatHUD(W, H, cx, u, matchSummary);
+		return;
+	}
 
 	// 1. Atmospheric Dark Vignette Overlay (D-18)
 	uiDrawRectScreen(vec2(cx, H / 2), vec2(W, H), new Color(0.04, 0.04, 0.06, 0.78));
@@ -654,7 +859,7 @@ function gameRenderPost() {
 
 			// Pause Card
 			const cardW = Math.min(W * 0.72, u * 26);
-			const cardH = H * 0.64;
+			const cardH = H * 0.72;
 			uiDrawRectScreen(vec2(cx, H * 0.5), vec2(cardW + 4, cardH + 4), colorWhite.scale(0.3));
 			uiDrawRectScreen(vec2(cx, H * 0.5), vec2(cardW, cardH), new Color(0.06, 0.06, 0.08, 0.95));
 
@@ -717,10 +922,35 @@ function gameRenderPost() {
 				}
 			}
 
+			// Button 4: [RESET HIGH SCORES] with two-click confirmation (D-49)
+			const resetY = H * 0.74;
+			const resetHover = Math.abs(mX - cx) < btnW / 2 && Math.abs(mY - resetY) < btnH / 2;
+			if (typeof g_resetHighScoreConfirmTimer !== "undefined" && g_resetHighScoreConfirmTimer > 0) {
+				g_resetHighScoreConfirmTimer--;
+			}
+			const isConfirming = (typeof g_resetHighScoreConfirmTimer !== "undefined" && g_resetHighScoreConfirmTimer > 0);
+			uiDrawRectScreen(vec2(cx, resetY), vec2(btnW, btnH), resetHover ? colorBlood.scale(0.5) : colorWhite.scale(0.12));
+			const resetText = isConfirming ? "⚠ CONFIRM RESET HIGH SCORES? ⚠" : "[ RESET HIGH SCORES ]";
+			drawTextWithOutline(resetText, vec2(cx, resetY), u * 0.72, isConfirming ? colorSpark : (resetHover ? colorBlood : colorWhite));
+			if (resetHover && mouseWasPressed(0)) {
+				uiSound(1);
+				if (isConfirming) {
+					if (typeof safeSetPref === 'function') {
+						safeSetPref('da_nightmare_best_wave', '0');
+						safeSetPref('da_nightmare_best_time', '0');
+						safeSetPref('da_high_score', '0');
+					}
+					try { if (typeof localStorage !== 'undefined') localStorage.da_t = 0; } catch (e) {}
+					g_resetHighScoreConfirmTimer = 0;
+				} else {
+					g_resetHighScoreConfirmTimer = 300; // 5s to confirm
+				}
+			}
+
 			// Desktop Streamer Dashboard Button (D-13)
 			const hasDesktopAPI = typeof window !== 'undefined' && (window.isDesktop || (window.electronAPI && window.electronAPI.openDashboard));
 			if (hasDesktopAPI) {
-				const dashY = H * 0.74;
+				const dashY = H * 0.80;
 
 				// Interactive button hover/click detection
 				const hovered = Math.abs(mX - cx) < btnW / 2 && Math.abs(mY - dashY) < btnH / 2;
@@ -736,6 +966,17 @@ function gameRenderPost() {
 				}
 			}
 		}
+	}
+
+	// Render Nightmare Top-Center Telemetry Plate (D-16)
+	let uPlate = Math.max(12, Math.min(mainCanvas.width, mainCanvas.height) / 40);
+	renderNightmareTelemetryPlate(mainCanvas.width, mainCanvas.height, uPlate);
+
+	// Render Personal Best Flare Banner (D-17)
+	if (typeof g_newPersonalBestBanner !== "undefined" && g_newPersonalBestBanner && g_newPersonalBestBanner.timer > 0) {
+		g_newPersonalBestBanner.timer--;
+		let bannerPulse = 1.0 + 0.08 * Math.sin(frame * 0.2);
+		drawTextWithOutline(g_newPersonalBestBanner.text, vec2(mainCanvas.width / 2, mainCanvas.height * 0.15), uPlate * 1.05 * bannerPulse, colorSpark);
 	}
 
 	textsDraw();

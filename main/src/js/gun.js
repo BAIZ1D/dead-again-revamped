@@ -103,6 +103,9 @@ class Gun extends EngineObject {
 					if (this.ammo == this._maxAmmo || this.noExtraAmmo) {
 						this.reloadTimer.unset();
 						this.reloading = false;
+						if (typeof g_apgManager !== "undefined" && g_apgManager) {
+							g_apgManager.jamImmunityFrames = 600; // 10s jam immunity post-reload (D-25)
+						}
 						if (this.isJammed) {
 							// jammed reload finished -> restore normal reload speed
 							this.isJammed = false;

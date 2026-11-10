@@ -1,5 +1,9 @@
 (() => {
   const wsStatusBadge = document.getElementById('ws-status-badge');
+  const nightmareStatusBadge = document.getElementById('nightmare-status-badge');
+  const nightmareBossPanel = document.getElementById('nightmare-boss-panel');
+  const nightmareBossCount = document.getElementById('nightmare-boss-count');
+  const nightmareBossList = document.getElementById('nightmare-boss-list');
   const channelBadge = document.getElementById('channel-badge');
   const viewerBadge = document.getElementById('viewer-badge');
   const authModeIndicator = document.getElementById('auth-mode-indicator');
@@ -380,6 +384,40 @@
       updatePredictionUI(status.prediction);
       if (status.prediction.outcomeResult) {
         updateOutcomeUI(status.prediction.outcomeResult);
+      }
+    }
+
+    const predLevel = (status.prediction && status.prediction.level) || status.level || 0;
+    const isNightmare = Boolean(status.isNightmare || predLevel > 5);
+    if (nightmareStatusBadge) {
+      if (isNightmare) {
+        const waveNum = Math.max(1, predLevel - 5);
+        nightmareStatusBadge.textContent = `NIGHTMARE GAUNTLET - WAVE ${waveNum}`;
+        nightmareStatusBadge.classList.remove('hidden');
+      } else {
+        nightmareStatusBadge.classList.add('hidden');
+      }
+    }
+
+    if (nightmareBossPanel && nightmareBossList) {
+      if (isNightmare && Array.isArray(status.bosses) && status.bosses.length > 0) {
+        nightmareBossPanel.classList.remove('hidden');
+        if (nightmareBossCount) nightmareBossCount.textContent = status.bosses.length;
+        nightmareBossList.innerHTML = status.bosses.map((b, i) => `
+          <div class="boss-card ${b.enraged ? 'enraged' : ''}">
+            <div class="boss-card-title">BOSS #${i + 1}</div>
+            <div class="boss-card-summoner">@${b.user || 'Chat'}</div>
+            <div class="boss-hp-bar">
+              <div class="boss-hp-fill" style="width: ${Math.max(0, Math.min(100, (b.hp / (b.maxHp || 16)) * 100))}%"></div>
+            </div>
+          </div>
+        `).join('');
+      } else if (!isNightmare || !status.bosses || status.bosses.length === 0) {
+        if (nightmareBossCount) nightmareBossCount.textContent = '0';
+        nightmareBossList.innerHTML = '';
+        if (!isNightmare) {
+          nightmareBossPanel.classList.add('hidden');
+        }
       }
     }
   }
