@@ -84,6 +84,11 @@ class APGManager {
 		this.ambientTelegraphFired = false;
 		this.bottomHudAlpha = 1.0;
 
+		// Cheat-Sheet command trigger & flare tracking (HUD-05, D-13, D-15, D-18, D-33)
+		this.commandLastTriggered = {};
+		this.commandPulseFrames = {};
+		this.cheatSheetFlare = { color: null, frames: 0, maxFrames: 0 };
+
 		// Register network listeners
 		if (typeof g_apgNetwork !== "undefined" && g_apgNetwork) {
 			var self = this;
@@ -108,6 +113,8 @@ class APGManager {
 		this.ambientFrenzyTimer = rand(2700, 3600) | 0;
 		this.ambientTelegraphFired = false;
 		this.bottomHudAlpha = 1.0;
+		this.commandPulseFrames = {};
+		this.cheatSheetFlare = { color: null, frames: 0, maxFrames: 0 };
 		this.resetForNewLevel();
 	}
 
@@ -134,6 +141,8 @@ class APGManager {
 		this.ambientFrenzyTimer = rand(2700, 3600) | 0;
 		this.ambientTelegraphFired = false;
 		this.bottomHudAlpha = 1.0;
+		this.commandPulseFrames = {};
+		this.cheatSheetFlare = { color: null, frames: 0, maxFrames: 0 };
 		this.clearActiveEffects();
 	}
 
@@ -248,9 +257,15 @@ class APGManager {
 	}
 
 	handleActionPacket(data) {
+		let action = String((data && data.action) || "").toLowerCase();
+		let curFrame = typeof frame !== "undefined" ? frame : 0;
+		if (action && action !== "divine_flash" && (typeof g_state === "undefined" || g_state === STATE_PLAYING)) {
+			this.commandLastTriggered[action] = curFrame;
+			this.commandPulseFrames[action] = 45; // D-13, D-15
+		}
+
 		if (typeof g_state === "undefined" || g_state !== STATE_PLAYING || !g_player || g_player.hp <= 0) return;
 
-		let action = String((data && data.action) || "").toLowerCase();
 		let team = data && data.team === "bad" ? "bad" : "good";
 		let rawUser = String((data && data.user) || "Chat").trim().replace(/^@+/, "") || "Chat";
 		let tag = this.formatUserTag(rawUser);
@@ -296,7 +311,6 @@ class APGManager {
 		}
 
 		// Track recent bad actions for fatal strike attribution (180 frames / 3.0s window, D-22)
-		let curFrame = typeof frame !== "undefined" ? frame : 0;
 		if (team === "bad") {
 			this.recentBadActions.push({
 				user: rawUser,
@@ -571,6 +585,7 @@ class APGManager {
 			this.timers.frenzy = Math.min(480, Math.max(this.timers.frenzy || 0, 0) + 480);
 			this.ambientFrenzyTimer = rand(2700, 3600) | 0; // Reset ambient countdown
 			this.ambientTelegraphFired = false;
+			this.triggerCheatSheetFlare("#FF4D4D", 30);
 			this.addToast("[BAD] @" + tag + " unleashed Enemy Blood FRENZY!", "bad");
 		}
 
@@ -629,6 +644,7 @@ class APGManager {
 		}
 
 		// Visual & audio nova
+		this.triggerCheatSheetFlare("#FBF236", 30);
 		if (typeof uiflashScreen === "function") uiflashScreen("#fbf236", 12);
 		if (typeof fx_shakeScreen === "function") fx_shakeScreen(1.2);
 		if (typeof soundDivineFlash !== "undefined") {
@@ -700,12 +716,17 @@ class APGManager {
 		}
 	}
 
+	triggerCheatSheetFlare(col, frames = 30) {
+		this.cheatSheetFlare = { color: col, frames: frames, maxFrames: frames };
+	}
+
 	triggerAmbientFrenzy() {
 		this.timers.slow = 0;
 		// 360 frames (6.0s duration) without double speed stacking (D-08, D-14)
 		this.timers.frenzy = Math.min(480, (this.timers.frenzy || 0) + 360);
 		this.ambientFrenzyTimer = rand(2700, 3600) | 0;
 		this.ambientTelegraphFired = false;
+		this.triggerCheatSheetFlare("#FF4D4D", 30);
 
 		if (typeof soundWarHorn !== "undefined") soundWarHorn.play();
 		uiflashScreen("#ac3232", 8);
@@ -721,6 +742,17 @@ class APGManager {
 	}
 
 	update() {
+		if (typeof g_isPaused === "undefined" || !g_isPaused) {
+			for (let cmd in this.commandPulseFrames) {
+				if (this.commandPulseFrames[cmd] > 0) {
+					this.commandPulseFrames[cmd]--;
+				}
+			}
+			if (this.cheatSheetFlare && this.cheatSheetFlare.frames > 0) {
+				this.cheatSheetFlare.frames--;
+			}
+		}
+
 		// Ambient Frenzy countdown & gating (D-07..D-11, D-14)
 		if (typeof g_state !== "undefined" && g_state === STATE_PLAYING && !g_isPaused && g_player && g_player.hp > 0) {
 			let livingEnemies = typeof g_enemies !== "undefined" ? g_enemies.filter(e => e && e.hp > 0).length : 0;
@@ -1703,6 +1735,139 @@ class APGManager {
 		}
 	}
 
+	renderCheatSheet(W, H, u) {
+		if (typeof g_cheatsheetSlideProgress === 'number' && g_cheatsheetSlideProgress <= 0.001) {
+			return;
+		}
+		if (typeof g_state !== 'undefined' && (g_state === STATE_LOBBY || g_state === STATE_OUTCOME || g_state === STATE_DEAD)) {
+			return;
+		}
+		if (typeof g_startHelpOpen !== 'undefined' && g_startHelpOpen) {
+			return;
+		}
+
+		const slide = typeof g_cheatsheetSlideProgress === 'number' ? g_cheatsheetSlideProgress : 1.0;
+		const isDockLeft = typeof g_cheatsheetDock !== 'undefined' && g_cheatsheetDock === 'left';
+
+		const cardW = Math.round(W * 0.24);
+		const cardH = Math.round(H * 0.24);
+		const baseCardX = isDockLeft ? Math.round(W * 0.02) : Math.round(W * 0.74);
+		const baseCardY = Math.round(H * 0.72);
+
+		const slideOffsetY = Math.round((1 - slide) * 12);
+		const cardX = baseCardX;
+		const cardY = baseCardY + slideOffsetY;
+
+		overlayContext.save();
+		try {
+			overlayContext.globalAlpha = Math.max(0, Math.min(1, slide));
+
+			overlayContext.fillStyle = 'rgba(10, 14, 20, 0.75)';
+			overlayContext.fillRect(cardX, cardY, cardW, cardH);
+
+			let strokeColor = 'rgba(145, 70, 255, 0.45)';
+			if (this.cheatSheetFlare && this.cheatSheetFlare.frames > 0) {
+				const flareRatio = this.cheatSheetFlare.frames / (this.cheatSheetFlare.maxFrames || 30);
+				strokeColor = this.cheatSheetFlare.color || '#FBF236';
+				overlayContext.shadowColor = strokeColor;
+				overlayContext.shadowBlur = 10 * flareRatio;
+			}
+			overlayContext.strokeStyle = strokeColor;
+			overlayContext.lineWidth = 1;
+			overlayContext.strokeRect(cardX, cardY, cardW, cardH);
+			overlayContext.shadowBlur = 0;
+
+			const headerH = Math.max(14, u * 1.1);
+			overlayContext.fillStyle = 'rgba(20, 15, 35, 0.85)';
+			overlayContext.fillRect(cardX, cardY, cardW, headerH);
+			overlayContext.strokeStyle = 'rgba(145, 70, 255, 0.35)';
+			overlayContext.strokeRect(cardX, cardY, cardW, headerH);
+
+			const promptKey = (typeof g_lastInputGamepad !== 'undefined' && g_lastInputGamepad) ? '[SELECT]' : '[C]';
+			const headerTitle = `TWITCH COMMANDS ${promptKey}`;
+			overlayContext.font = `bold ${Math.max(9, u * 0.48)}px ${typeof fontDefault !== 'undefined' ? fontDefault : 'monospace'}`;
+			overlayContext.textAlign = 'center';
+			overlayContext.textBaseline = 'middle';
+			overlayContext.fillStyle = '#E9D5FF';
+			overlayContext.fillText(headerTitle, cardX + cardW / 2, cardY + headerH / 2);
+
+			const bodyY = cardY + headerH;
+			const bodyH = cardH - headerH;
+			const dividerX = Math.round(cardX + cardW / 2);
+
+			overlayContext.beginPath();
+			overlayContext.strokeStyle = 'rgba(145, 70, 255, 0.35)';
+			overlayContext.lineWidth = 1;
+			overlayContext.moveTo(dividerX, bodyY);
+			overlayContext.lineTo(dividerX, cardY + cardH);
+			overlayContext.stroke();
+
+			const goodCommands = [
+				{ cmd: '!ammo', key: 'ammo', label: '+Primary Ammo' },
+				{ cmd: '!barrier', key: 'barrier', label: '+Repel Rune' },
+				{ cmd: '!repair', key: 'repair', label: '+Shield Pip' },
+				{ cmd: '!slow', key: 'slow', label: '-50% Enemy Spd' },
+				{ cmd: '!light', key: 'light', label: '+Arena Light' }
+			];
+
+			const badCommands = [
+				{ cmd: '!mob', key: 'mob', label: '+Zombie Spawn' },
+				{ cmd: '!boss', key: 'boss', label: '+Siege Boss' },
+				{ cmd: '!jam', key: 'jam', label: 'Weapon Jam' },
+				{ cmd: '!blackout', key: 'blackout', label: 'Darkness 8s' },
+				{ cmd: '!frenzy', key: 'frenzy', label: 'Blood Frenzy' }
+			];
+
+			const rowH = bodyH / 5;
+			const colW = (cardW - 4) / 2;
+
+			const renderColumn = (items, startColX, isGood) => {
+				const teamHex = isGood ? '#4ADE80' : '#FF4D4D';
+				for (let i = 0; i < items.length; i++) {
+					const item = items[i];
+					const entryY = bodyY + i * rowH;
+					const pulseFrames = this.commandPulseFrames[item.key] || 0;
+					const isPulsing = pulseFrames > 0;
+					const pulseRatio = pulseFrames / 45;
+
+					overlayContext.save();
+					if (isPulsing) {
+						const midX = startColX + colW / 2;
+						const midY = entryY + rowH / 2;
+						overlayContext.translate(midX, midY);
+						overlayContext.scale(1.0 + 0.05 * pulseRatio, 1.0 + 0.05 * pulseRatio);
+						overlayContext.translate(-midX, -midY);
+
+						overlayContext.strokeStyle = teamHex;
+						overlayContext.lineWidth = 1.2;
+						overlayContext.shadowColor = teamHex;
+						overlayContext.shadowBlur = 8 * pulseRatio;
+						overlayContext.strokeRect(startColX + 2, entryY + 1, colW - 4, rowH - 2);
+						overlayContext.shadowBlur = 0;
+					}
+
+					overlayContext.font = `bold ${Math.max(9, u * 0.48)}px ${typeof fontDefault !== 'undefined' ? fontDefault : 'monospace'}`;
+					overlayContext.textAlign = 'left';
+					overlayContext.textBaseline = 'top';
+					overlayContext.fillStyle = teamHex;
+					overlayContext.fillText(item.cmd, startColX + 6, entryY + 2);
+
+					overlayContext.font = `${Math.max(7.5, u * 0.38)}px ${typeof fontDefault !== 'undefined' ? fontDefault : 'monospace'}`;
+					overlayContext.fillStyle = 'rgba(255, 255, 255, 0.85)';
+					overlayContext.fillText(item.label, startColX + 6, entryY + rowH * 0.52);
+
+					overlayContext.restore();
+				}
+			};
+
+			renderColumn(goodCommands, cardX + 1, true);
+			renderColumn(badCommands, dividerX + 1, false);
+
+		} finally {
+			overlayContext.restore();
+		}
+	}
+
 	renderHUD() {
 		if (typeof g_state === "undefined" || g_state !== STATE_PLAYING) return;
 		const W =
@@ -1738,6 +1903,7 @@ class APGManager {
 		this.renderToastsAndCharges(W, H, u);
 		this.renderCenterBanner(W, H, cx, u);
 		this.renderAmbientTelegraphVignette(W, H, cx);
+		this.renderCheatSheet(W, H, u);
 	}
 }
 
