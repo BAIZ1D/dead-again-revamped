@@ -169,6 +169,425 @@ function renderStartMoon(cx, cy, u, W, H, safeW, safeH) {
     overlayContext.restore();
 }
 
+// Static Normalized Anchor Tables for 3-Plane Gothic Graveyard Silhouette (VIS-02, D-01..D-08)
+// Format: [xRatio, widthU, heightU, type, extra]
+// Plane 1: Distant gothic cathedral spires (0), pointed roofs (1), stone mausoleums (2)
+const START_GRAVEYARD_PLANE1 = [
+    [0.06, 2.2, 6.8, 0, 1], // Far-left cathedral spire with lancet window
+    [0.12, 3.0, 4.2, 1, 0], // Left pointed nave roof
+    [0.19, 2.5, 5.8, 0, 1], // Inner-left bell spire with lancet window
+    [0.27, 2.6, 3.1, 2, 0], // Left-mid distant stone mausoleum
+    [0.73, 2.8, 3.3, 2, 0], // Right-mid distant stone mausoleum
+    [0.81, 2.4, 6.2, 0, 1], // Inner-right bell spire with lancet window
+    [0.88, 3.2, 4.4, 1, 0], // Right pointed chapel roof
+    [0.94, 2.3, 7.1, 0, 1]  // Far-right tall cathedral spire with lancet window
+];
+
+// Plane 2: Twisted dead oak trees (0), weathered stone vaults (1), crooked Latin/Celtic crosses (2, 3)
+const START_GRAVEYARD_PLANE2 = [
+    [0.04, 1.4, 6.4, 0, -1], // Far-left gnarled dead oak reaching right
+    [0.15, 0.9, 2.4, 2, -0.14], // Left crooked Latin cross
+    [0.23, 2.2, 2.5, 1, 0],  // Left weathered stone vault
+    [0.32, 1.0, 2.6, 3, 0.12],  // Left-center Celtic cross
+    [0.68, 1.0, 2.5, 2, -0.16], // Right-center crooked Latin cross
+    [0.76, 2.3, 2.6, 1, 0],  // Right weathered stone vault
+    [0.85, 1.0, 2.7, 3, 0.15],  // Right Celtic cross
+    [0.95, 1.5, 6.8, 0, 1]   // Far-right gnarled dead oak reaching left
+];
+
+// Plane 3: Leaning headstones (0), crooked crosses (1), cracked obelisks (2), flat burial slabs (3)
+const START_GRAVEYARD_PLANE3 = [
+    [0.08, 1.1, 1.9, 0, -0.12], // Leaning round-top headstone
+    [0.14, 1.8, 0.7, 3, 0.0],   // Flat mossy burial slab
+    [0.20, 0.9, 3.2, 2, 0.05],  // Cracked pointed obelisk
+    [0.28, 1.0, 1.8, 0, 0.14],  // Leaning round-top headstone
+    [0.36, 0.8, 2.1, 1, -0.18], // Foreground crooked cross
+    [0.44, 1.6, 0.6, 3, 0.0],   // Center-left low burial slab
+    [0.56, 1.7, 0.6, 3, 0.0],   // Center-right low burial slab
+    [0.64, 1.1, 1.9, 0, -0.15], // Leaning round-top headstone
+    [0.72, 0.9, 3.4, 2, -0.06], // Cracked pointed obelisk
+    [0.80, 0.8, 2.2, 1, 0.16],  // Foreground crooked cross
+    [0.87, 1.8, 0.7, 3, 0.0],   // Flat mossy burial slab
+    [0.92, 1.2, 2.0, 0, 0.11]   // Far-right leaning headstone
+];
+
+// Scooped U-Profile Ground Baseline Y Evaluator (VIS-02, D-02)
+// Dips to 76% H (24% from bottom) at screen center, rising to 60% H (40% from bottom) at flanks
+function getStartHorizonY(x, W, H, planeOffsetRatio) {
+    const normX = (x / Math.max(1, W)) * 2 - 1; // -1 at left edge, 0 at center, +1 at right edge
+    const scoop = normX * normX; // Parabolic U-profile: 0 at center, 1 at edges
+    const baseYRatio = 0.76 - 0.16 * scoop + (planeOffsetRatio || 0);
+    return H * baseYRatio;
+}
+
+// 3-Plane Gothic Graveyard Silhouette & Scooped U-Profile Horizon Engine (VIS-02, D-01..D-08)
+function renderStartGraveyard(W, H, u, safeW, safeH, plane) {
+    if (typeof overlayContext === 'undefined' || !overlayContext) return;
+    const targetPlane = (typeof plane === 'number') ? plane : 0;
+    overlayContext.save();
+
+    const step = Math.max(2, Math.round(u / 8));
+    const slices = 48;
+    const sliceW = Math.ceil(W / slices) + 1;
+
+    // Helper: draw scooped U-profile ground mass and lunar rim highlight for a given plane
+    const drawScoopedGround = (planeOffset, fillHex, rimHex) => {
+        overlayContext.fillStyle = fillHex;
+        overlayContext.beginPath();
+        overlayContext.moveTo(0, H);
+        for (let i = 0; i <= slices; i++) {
+            const sx = (i / slices) * W;
+            const sy = Math.round(getStartHorizonY(sx, W, H, planeOffset) / step) * step;
+            overlayContext.lineTo(sx, sy);
+        }
+        overlayContext.lineTo(W, H);
+        overlayContext.closePath();
+        overlayContext.fill();
+
+        // 1px stepped lunar rim highlight facing upper-right moon (D-03)
+        overlayContext.fillStyle = rimHex;
+        for (let i = 0; i < slices; i++) {
+            const sx = Math.floor((i / slices) * W);
+            const sy = Math.round(getStartHorizonY(sx, W, H, planeOffset) / step) * step;
+            overlayContext.fillRect(sx, sy, sliceW, Math.max(1, (step * 0.5) | 0));
+        }
+    };
+
+    // PLANE 1: Distant Cathedral Spires, Pointed Roofs & Mausoleums with Lancet Windows (D-01, D-07)
+    if (targetPlane === 0 || targetPlane === 1) {
+        const p1Offset = -0.035;
+        drawScoopedGround(p1Offset, '#12091A', '#3A1230');
+
+        for (let i = 0; i < START_GRAVEYARD_PLANE1.length; i++) {
+            const item = START_GRAVEYARD_PLANE1[i];
+            const mx = item[0] * W;
+            const mw = item[1] * u;
+            const mh = item[2] * u;
+            const mType = item[3];
+            const hasWindow = item[4];
+            const baseY = getStartHorizonY(mx, W, H, p1Offset) + u * 0.4;
+
+            overlayContext.fillStyle = '#12091A';
+            if (mType === 0) {
+                // Gothic Cathedral Spire (tower body + steep pointed steeple + finial cross)
+                const towerH = mh * 0.48;
+                const spireH = mh * 0.52;
+                overlayContext.fillRect(mx - mw * 0.5, baseY - towerH, mw, towerH);
+                overlayContext.beginPath();
+                overlayContext.moveTo(mx - mw * 0.58, baseY - towerH);
+                overlayContext.lineTo(mx, baseY - mh);
+                overlayContext.lineTo(mx + mw * 0.58, baseY - towerH);
+                overlayContext.closePath();
+                overlayContext.fill();
+
+                // Right-edge 1px lunar rim highlight (#3A1230)
+                overlayContext.strokeStyle = '#3A1230';
+                overlayContext.lineWidth = 1.2;
+                overlayContext.beginPath();
+                overlayContext.moveTo(mx, baseY - mh);
+                overlayContext.lineTo(mx + mw * 0.58, baseY - towerH);
+                overlayContext.lineTo(mx + mw * 0.5, baseY - towerH);
+                overlayContext.lineTo(mx + mw * 0.5, baseY);
+                overlayContext.stroke();
+
+                // Finial spire cross
+                const finH = u * 0.7;
+                overlayContext.fillStyle = '#3A1230';
+                overlayContext.fillRect(mx - 1, baseY - mh - finH, 2, finH);
+                overlayContext.fillRect(mx - u * 0.25, baseY - mh - finH * 0.65, u * 0.5, 2);
+
+                // Arched Lancet Window Pips with Warm Amber/Rose Flicker (D-07)
+                if (hasWindow) {
+                    const flicker = 0.70 + 0.30 * Math.sin(frame * 0.09 + i * 2.1);
+                    const winW = Math.max(2, Math.round(u * 0.16));
+                    const winH = Math.max(4, Math.round(u * 0.36));
+                    const winY = baseY - towerH * 0.68;
+                    overlayContext.fillStyle = `rgba(255, 170, 50, ${(0.45 * flicker).toFixed(3)})`;
+                    overlayContext.fillRect(mx - winW - 1, winY, winW, winH);
+                    overlayContext.fillRect(mx + 2, winY, winW, winH);
+                }
+            } else if (mType === 1) {
+                // Pointed Nave Roof
+                const wallH = mh * 0.55;
+                overlayContext.fillRect(mx - mw * 0.5, baseY - wallH, mw, wallH);
+                overlayContext.beginPath();
+                overlayContext.moveTo(mx - mw * 0.55, baseY - wallH);
+                overlayContext.lineTo(mx, baseY - mh);
+                overlayContext.lineTo(mx + mw * 0.55, baseY - wallH);
+                overlayContext.closePath();
+                overlayContext.fill();
+
+                overlayContext.strokeStyle = '#3A1230';
+                overlayContext.lineWidth = 1.0;
+                overlayContext.beginPath();
+                overlayContext.moveTo(mx, baseY - mh);
+                overlayContext.lineTo(mx + mw * 0.55, baseY - wallH);
+                overlayContext.stroke();
+            } else {
+                // Imposing Stone Mausoleum with stepped pediment
+                overlayContext.fillRect(mx - mw * 0.5, baseY - mh * 0.75, mw, mh * 0.75);
+                overlayContext.fillRect(mx - mw * 0.38, baseY - mh * 0.92, mw * 0.76, mh * 0.17);
+                overlayContext.fillStyle = '#3A1230';
+                overlayContext.fillRect(mx + mw * 0.5 - 1.5, baseY - mh * 0.75, 1.5, mh * 0.75);
+            }
+        }
+    }
+
+    // PLANE 2: Midground Twisted Dead Oaks, Stone Vaults & Crooked Crosses (D-01, D-05, D-06)
+    if (targetPlane === 0 || targetPlane === 2) {
+        const p2Offset = -0.015;
+        drawScoopedGround(p2Offset, '#100718', '#4A1536');
+
+        for (let i = 0; i < START_GRAVEYARD_PLANE2.length; i++) {
+            const item = START_GRAVEYARD_PLANE2[i];
+            const mx = item[0] * W;
+            const mw = item[1] * u;
+            const mh = item[2] * u;
+            const mType = item[3];
+            const tilt = item[4];
+            const baseY = getStartHorizonY(mx, W, H, p2Offset) + u * 0.25;
+
+            if (mType === 0) {
+                // Gnarled Dead Oak Tree with skeletal diagonal branch fingers (D-06)
+                const dir = tilt < 0 ? 1 : -1; // Reach inward toward center/moon
+                overlayContext.save();
+                overlayContext.fillStyle = '#12091A';
+                overlayContext.strokeStyle = '#12091A';
+                overlayContext.lineCap = 'butt';
+
+                // Gnarled trunk
+                overlayContext.beginPath();
+                overlayContext.moveTo(mx - mw * 0.55, baseY);
+                overlayContext.lineTo(mx - mw * 0.25 + dir * u * 0.3, baseY - mh * 0.55);
+                overlayContext.lineTo(mx + dir * u * 0.7, baseY - mh);
+                overlayContext.lineTo(mx + mw * 0.22 + dir * u * 0.5, baseY - mh * 0.55);
+                overlayContext.lineTo(mx + mw * 0.55, baseY);
+                overlayContext.closePath();
+                overlayContext.fill();
+
+                // Skeletal diagonal branch fingers
+                const branches = [
+                    [0.45, dir * 2.2, -0.35, 0.22],
+                    [0.65, dir * 2.8, -0.42, 0.18],
+                    [0.78, -dir * 1.6, -0.28, 0.16],
+                    [0.88, dir * 1.9, -0.30, 0.14]
+                ];
+                for (let b = 0; b < branches.length; b++) {
+                    const br = branches[b];
+                    const bx0 = mx + dir * u * 0.3 * br[0];
+                    const by0 = baseY - mh * br[0];
+                    const bx1 = bx0 + br[1] * u;
+                    const by1 = by0 + br[2] * mh;
+                    overlayContext.lineWidth = Math.max(2, br[3] * u);
+                    overlayContext.beginPath();
+                    overlayContext.moveTo(bx0, by0);
+                    overlayContext.lineTo(bx1, by1);
+                    overlayContext.stroke();
+
+                    // Sub-twig fingers
+                    overlayContext.lineWidth = Math.max(1.5, br[3] * u * 0.55);
+                    overlayContext.beginPath();
+                    overlayContext.moveTo((bx0 + bx1) * 0.5, (by0 + by1) * 0.5);
+                    overlayContext.lineTo(bx1 + dir * u * 0.5, by1 - u * 0.6);
+                    overlayContext.stroke();
+                }
+
+                // Lunar rim highlight on upper-right edges (#4A1536)
+                overlayContext.strokeStyle = '#4A1536';
+                overlayContext.lineWidth = 1.2;
+                overlayContext.beginPath();
+                overlayContext.moveTo(mx + mw * 0.45, baseY);
+                overlayContext.lineTo(mx + mw * 0.22 + dir * u * 0.5, baseY - mh * 0.55);
+                overlayContext.lineTo(mx + dir * u * 0.7, baseY - mh);
+                overlayContext.stroke();
+                overlayContext.restore();
+            } else if (mType === 1) {
+                // Weathered Stone Vault
+                overlayContext.fillStyle = '#12091A';
+                overlayContext.fillRect(mx - mw * 0.5, baseY - mh * 0.8, mw, mh * 0.8);
+                overlayContext.beginPath();
+                overlayContext.arc(mx, baseY - mh * 0.8, mw * 0.5, Math.PI, 0);
+                overlayContext.fill();
+                overlayContext.strokeStyle = '#4A1536';
+                overlayContext.lineWidth = 1.2;
+                overlayContext.beginPath();
+                overlayContext.arc(mx, baseY - mh * 0.8, mw * 0.5, Math.PI * 1.45, 0);
+                overlayContext.lineTo(mx + mw * 0.5, baseY);
+                overlayContext.stroke();
+            } else {
+                // Crooked Latin (2) or Celtic (3) Cross (D-05)
+                overlayContext.save();
+                overlayContext.translate(mx, baseY);
+                overlayContext.rotate(tilt);
+                overlayContext.fillStyle = '#12091A';
+                const stemW = Math.max(3, mw * 0.28);
+                const crossBarY = -mh * 0.72;
+                overlayContext.fillRect(-stemW / 2, -mh, stemW, mh);
+                overlayContext.fillRect(-mw * 0.55, crossBarY - stemW * 0.45, mw * 1.1, stemW * 0.9);
+                if (mType === 3) {
+                    // Celtic ring
+                    overlayContext.strokeStyle = '#12091A';
+                    overlayContext.lineWidth = Math.max(2, stemW * 0.65);
+                    overlayContext.beginPath();
+                    overlayContext.arc(0, crossBarY, mw * 0.34, 0, Math.PI * 2);
+                    overlayContext.stroke();
+                }
+                // Lunar rim highlight
+                overlayContext.fillStyle = '#4A1536';
+                overlayContext.fillRect(stemW / 2 - 1, -mh, 1.2, mh);
+                overlayContext.fillRect(-mw * 0.55, crossBarY - stemW * 0.45, mw * 1.1, 1.2);
+                overlayContext.restore();
+            }
+        }
+    }
+
+    // PLANE 3: Foreground Tombstones, Obelisks, Burial Slabs & Wrought-Iron Spear Railings (D-01, D-05, D-08)
+    if (targetPlane === 0 || targetPlane === 3) {
+        const p3Offset = 0.0;
+        drawScoopedGround(p3Offset, '#12091A', '#5A183C');
+
+        // 1. Wrought-Iron Spear-Picket Fence Segments & Stepped Pixel Grass Tufts (D-08)
+        const fenceClusters = [
+            [0.09, 0.26],
+            [0.30, 0.42],
+            [0.58, 0.70],
+            [0.74, 0.91]
+        ];
+        const picketSpacing = Math.max(5, Math.round(u * 0.42));
+        const picketH = u * 1.35;
+
+        for (let c = 0; c < fenceClusters.length; c++) {
+            const xStart = Math.floor(fenceClusters[c][0] * W);
+            const xEnd = Math.floor(fenceClusters[c][1] * W);
+
+            // Horizontal wrought-iron rails
+            overlayContext.strokeStyle = '#2D1E3A';
+            overlayContext.lineWidth = Math.max(1.2, u * 0.08);
+            overlayContext.beginPath();
+            const yStart = getStartHorizonY(xStart, W, H, p3Offset);
+            const yEnd = getStartHorizonY(xEnd, W, H, p3Offset);
+            overlayContext.moveTo(xStart, yStart - picketH * 0.75);
+            overlayContext.lineTo(xEnd, yEnd - picketH * 0.75);
+            overlayContext.moveTo(xStart, yStart - picketH * 0.28);
+            overlayContext.lineTo(xEnd, yEnd - picketH * 0.28);
+            overlayContext.stroke();
+
+            // Spear pickets + stepped grass tufts at base
+            let pIdx = 0;
+            for (let px = xStart; px <= xEnd; px += picketSpacing) {
+                const py = getStartHorizonY(px, W, H, p3Offset);
+                const bend = ((pIdx % 5 === 2) ? 0.09 : (pIdx % 7 === 4 ? -0.08 : 0));
+                const topX = px + bend * picketH;
+                const topY = py - picketH;
+
+                overlayContext.strokeStyle = (pIdx % 3 === 0) ? '#5A183C' : '#2D1E3A';
+                overlayContext.lineWidth = Math.max(1.2, u * 0.09);
+                overlayContext.beginPath();
+                overlayContext.moveTo(px, py + 2);
+                overlayContext.lineTo(topX, topY);
+                overlayContext.stroke();
+
+                // Spearhead finial tip
+                overlayContext.fillStyle = '#5A183C';
+                overlayContext.beginPath();
+                overlayContext.moveTo(topX, topY - u * 0.22);
+                overlayContext.lineTo(topX - u * 0.11, topY + u * 0.06);
+                overlayContext.lineTo(topX + u * 0.11, topY + u * 0.06);
+                overlayContext.closePath();
+                overlayContext.fill();
+
+                // Stepped pixel grass tufts at horizon base (D-08)
+                overlayContext.fillStyle = '#12091A';
+                overlayContext.fillRect(px - 2, py - step, step, step);
+                if (pIdx % 2 === 0) {
+                    overlayContext.fillStyle = '#3A1230';
+                    overlayContext.fillRect(px + 1, py - step * 1.5, step, step);
+                }
+                pIdx++;
+            }
+        }
+
+        // 2. 4 Iconic 16-Bit Marker Primitives (Headstones, Crooked Crosses, Obelisks, Burial Slabs, D-05)
+        for (let i = 0; i < START_GRAVEYARD_PLANE3.length; i++) {
+            const item = START_GRAVEYARD_PLANE3[i];
+            const mx = item[0] * W;
+            const mw = item[1] * u;
+            const mh = item[2] * u;
+            const mType = item[3];
+            const tilt = item[4];
+            const baseY = getStartHorizonY(mx, W, H, p3Offset) + u * 0.15;
+
+            overlayContext.save();
+            overlayContext.translate(mx, baseY);
+            if (tilt) overlayContext.rotate(tilt);
+
+            if (mType === 0) {
+                // Leaning Round-Top Headstone
+                const straightH = mh * 0.68;
+                const archR = mw * 0.5;
+                overlayContext.fillStyle = '#12091A';
+                overlayContext.fillRect(-archR, -straightH, mw, straightH);
+                overlayContext.beginPath();
+                overlayContext.arc(0, -straightH, archR, Math.PI, 0);
+                overlayContext.fill();
+
+                // 1px lunar rim highlight (#5A183C)
+                overlayContext.strokeStyle = '#5A183C';
+                overlayContext.lineWidth = 1.4;
+                overlayContext.beginPath();
+                overlayContext.arc(0, -straightH, archR, Math.PI * 1.35, 0);
+                overlayContext.lineTo(archR, 0);
+                overlayContext.stroke();
+
+                // Engraved RIP notch pixels
+                overlayContext.fillStyle = '#3A1230';
+                overlayContext.fillRect(-mw * 0.25, -straightH * 0.72, mw * 0.5, Math.max(1.5, step * 0.6));
+            } else if (mType === 1) {
+                // Foreground Crooked Cross
+                const stemW = Math.max(3, mw * 0.30);
+                const barY = -mh * 0.70;
+                overlayContext.fillStyle = '#12091A';
+                overlayContext.fillRect(-stemW / 2, -mh, stemW, mh);
+                overlayContext.fillRect(-mw * 0.55, barY - stemW * 0.45, mw * 1.1, stemW * 0.9);
+                overlayContext.fillStyle = '#5A183C';
+                overlayContext.fillRect(stemW / 2 - 1.2, -mh, 1.4, mh);
+                overlayContext.fillRect(-mw * 0.55, barY - stemW * 0.45, mw * 1.1, 1.4);
+            } else if (mType === 2) {
+                // Cracked Pointed Obelisk
+                const shaftH = mh * 0.78;
+                overlayContext.fillStyle = '#12091A';
+                overlayContext.beginPath();
+                overlayContext.moveTo(-mw * 0.55, 0);
+                overlayContext.lineTo(-mw * 0.35, -shaftH);
+                overlayContext.lineTo(0, -mh);
+                overlayContext.lineTo(mw * 0.35, -shaftH);
+                overlayContext.lineTo(mw * 0.55, 0);
+                overlayContext.closePath();
+                overlayContext.fill();
+
+                // Crack notch & right lunar rim highlight (#5A183C)
+                overlayContext.strokeStyle = '#5A183C';
+                overlayContext.lineWidth = 1.4;
+                overlayContext.beginPath();
+                overlayContext.moveTo(0, -mh);
+                overlayContext.lineTo(mw * 0.35, -shaftH);
+                overlayContext.lineTo(mw * 0.55, 0);
+                overlayContext.stroke();
+            } else {
+                // Flat Mossy Burial Slab
+                overlayContext.fillStyle = '#12091A';
+                overlayContext.fillRect(-mw * 0.5, -mh, mw, mh);
+                overlayContext.fillStyle = '#5A183C';
+                overlayContext.fillRect(-mw * 0.5, -mh, mw, 1.5);
+                overlayContext.fillRect(mw * 0.5 - 1.5, -mh, 1.5, mh);
+            }
+            overlayContext.restore();
+        }
+    }
+
+    overlayContext.restore();
+}
+
 // 16:9 Virtual Safe Zone Clamping (D-15)
 function getStartScreenSafeZone(canvasW, canvasH) {
     const targetAspect = 16 / 9;
