@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Packaging & Verification
-status: verifying
-last_updated: "2026-11-10T06:02:32.218Z"
+status: ready_to_plan
+last_updated: 2026-11-10T06:05:16.963Z
 last_activity: 2026-11-10
 progress:
   total_phases: 6
@@ -11,6 +11,7 @@ progress:
   total_plans: 7
   completed_plans: 7
   percent: 50
+stopped_at: Phase 21 complete (2/2) — ready to discuss Phase 22
 ---
 
 # Project State
@@ -22,13 +23,13 @@ See: `.planning/ROADMAP.md` (created 2026-11-10)
 See: `.planning/REQUIREMENTS.md` (traceability mapped 2026-11-10)  
 
 **Core value:** A high-stakes, real-time tug-of-war between streamer survival and audience sabotage powered by native Twitch Channel Point predictions and dynamic in-game audience events--with zero external stream overlays required.  
-**Current focus:** Phase 21 — 16-bit-retro-arcade-start-screen-visual-overhaul
+**Current focus:** Phase 22 — in game stream command cheat sheet & streamer ergonomics
 
 ## Current Position
 
-Phase: 21 (16-bit-retro-arcade-start-screen-visual-overhaul) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
+Phase: 22
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-11-10
 
 ## Active Milestone: v1.6 (Release v1.3.0)
