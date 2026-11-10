@@ -5,7 +5,7 @@
 <h3 align="center">Retro Top-Down Zombie Survival Shooter with Native Twitch Audience Participation</h3>
 
 <p align="center">
-  <a href="https://github.com/BAIZ1D/dead-again-revamped/releases"><img src="https://img.shields.io/badge/Release-v1.2.0-9146FF?style=flat-square" alt="Version 1.2.0"></a>
+  <a href="https://github.com/BAIZ1D/dead-again-revamped/releases"><img src="https://img.shields.io/badge/Release-v1.3.0-9146FF?style=flat-square" alt="Version 1.3.0"></a>
   <a href="#downloads-and-releases"><img src="https://img.shields.io/badge/Platform-macOS%20Universal%20%7C%20Windows%20x64-2ea44f?style=flat-square" alt="macOS and Windows"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GNU%20AGPL%20v3.0-blue?style=flat-square" alt="GNU AGPLv3"></a>
   <a href="LICENSE-THIRD-PARTY.txt"><img src="https://img.shields.io/badge/Third--Party-MIT%20Permissive-lightgrey?style=flat-square" alt="MIT License"></a>
@@ -24,6 +24,35 @@ Your audience splits into two competing factions in a continuous tug-of-war:
 - **Team Bad**: Summons aggressive zombie waves, spawns armored elite bosses, triggers sensory blackouts, and temporarily jams the streamer's firearms.
 
 The entire experience runs locally through a high-performance native desktop architecture—no web overlays, no browser source latency, and zero OBS performance bottlenecks.
+
+---
+
+## Milestone v1.6 Feature Showcases
+
+Milestone v1.6 (Release v1.3.0) introduces major new gameplay systems, stream overlays, and atmospheric enhancements:
+
+1. **Endless Multi-Room Nightmare Survival Gauntlet:**
+   - Unlocked upon completing Level 5, the Nightmare Gauntlet challenges survivors to an infinite escalating multi-room dungeon trial cycling through rooms 0, 1, 3, 4, and 2.
+   - Dynamic audience-driven elite encounters: up to 5 concurrent Heavy Boss Zombies with enrage speed surges and minion summon pulses.
+   - Emergency survivor care packages (`!ammo`, `!repair`, `!light`) periodically parachuted into the arena.
+   - Persistent high scores tracking Best Wave and Survival Time saved across restarts.
+
+2. **In-Game Stream Command Cheat-Sheet:**
+   - Non-modal spectator command reference accessible during live combat and pauses via keyboard shortcut `[C]` or gamepad `SELECT` / `Back`.
+   - Real-time command pulse and flare animations triggering instantly as viewers chat `!ammo`, `!repair`, `!boss`, etc.
+   - Side docking flip (`Shift+C` or Pause Menu) between Bottom-Right and Bottom-Left corners to accommodate streamer facecams with zero gameplay obstruction.
+
+3. **16-Bit Retro Arcade Start Screen:**
+   - Procedural 15-step atmospheric depth sandwich featuring an authentic Bayer-dithered Blood Moon and twin pulsating concentric halo rings.
+   - 3-plane parallax graveyard silhouettes (cathedrals, crooked crosses, spiked iron fences) with multi-speed horizontal fog drift.
+   - 24 procedural rising ember particles with turbulent sine flutter.
+   - Interactive moon easter egg with corona flares and authentic sound feedback.
+
+4. **Survivor Field Manual Compendium:**
+   - In-game tabbed reference manual on the Start Screen (`[H]`) featuring detailed Weapon Stat Cards (Pistol, SMG, Shotgun), Bestiary threat dossiers (including the Heavy Boss Zombie), and Twitch APG mechanics.
+
+5. **Start Screen Credits Modal:**
+   - Dedicated `[C] CREDITS` modal honoring lead creator Baizid Al Hamid, original concept creators Jonas Olmstead & Jesper Rasmussen, music composer Andrei Moskvitin Josephsen, and core open-source technologies (LittleJS, ZzFX, Twurple, tmi.js) with zero legal legalese.
 
 ---
 
@@ -204,38 +233,6 @@ npm run dev:desktop
 npm run pack:mac   # Builds macOS Universal DMG and ZIP
 npm run pack:win   # Builds Windows x64 NSIS installer and portable ZIP
 ```
-
----
-
-## Release Notes & Changelog
-
-### Version 1.2.0 (Milestone v1.5)
-
-Dead Again - Revamped v1.2.0 delivers major tactical combat refinements, ergonomic HUD redesigns, and a complete retro arcade visual overhaul:
-
-1. **Tactical Combat Balancing:**
-   - Machine Pistol (SMG) transformed into high-velocity spray weapon with 20-round chamber capacity and 80ms cyclic rate (~12.5 shots/s; full mag dumped in ~1.52s).
-   - Dual-profile recoil engine: 3-shot burst taps preserve laser accuracy ($S \le 0.02$ rad / $\approx 1.15^\circ$) with zero camera shake; continuous hold trigger escalates non-linear bloom cone up to $\pm 0.48$ rad ($\approx 27.5^\circ$) with $\pm 8\%$ velocity jitter and micro-screenshake.
-   - 160ms trigger release pause reset window fully restores laser pinpoint accuracy.
-
-2. **HUD Ergonomics & Anti-Clipping:**
-   - SMG chambered ammo wrapped into a 2x10 micro-pip grid ($0.52 \cdot \text{scaleUI}$) contained strictly within equipment card box, eliminating bullet icon overflow.
-   - Player health pips relocated beneath avatar portrait in world space (`pos.y - 1.35 * scaleUI`) with dark armored backing plate and 1 HP double-beat biological pulse.
-   - Center notification banners dynamically calculate container dimensions (`u * 2.4` single vs `u * 3.4` dual-line) and anchor text relative to box center, eliminating subtitle clipping on Divine Flash & Blood Surge across 720p, 1080p, and 4K viewports.
-   - Repaired text outline stroke styling polymorphism (`drawTextWithOutline` supporting 5- and 6-argument calls) resolving numeric `strokeStyle` assignments.
-
-3. **Start Screen Retro Arcade Visual Overhaul:**
-   - Procedural Canvas 2D heraldic crest with crossed Shotgun and SMG tiles at $\pm 35^\circ$ with specular glints.
-   - Floating Survivor vs Zombie portraits with $\pm 3$px idle sinusoidal bobbing and faction auras.
-   - 24 procedural rising ember particles with upward drift, horizontal sine flutter, and boundary fade.
-   - Authentic 3px CRT scanlines and dark-crimson perimeter radial vignette.
-   - Layered chromatic typography glows (Twitch-purple `#9146FF` and blood-red) with 4-second specular sheen sweep on subtitle ribbon.
-   - In-game Canvas 2D tabbed Field Manual & Streamer Guide overlay (`[H]`) with 3 navigable tabs.
-
-4. **Distribution & Standalone Engine Integrity:**
-   - Synchronized version `1.2.0` across all package manifests and desktop updater/menu routines.
-   - Zero-dependency standalone architecture compiling all 30 source modules cleanly into `main/dist/js/index.js`.
-   - 100% green test passes across all 7 repository verification suites (Phase 12, 13, 15, 16, 17, Packaging, Distribution).
 
 ---
 

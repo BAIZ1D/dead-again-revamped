@@ -1,9 +1,9 @@
 # Streamer Broadcast & Integration Guide
-### Dead Again - Revamped (Twitch Edition)
+### Dead Again - Revamped (Twitch Edition) — Release v1.3.0
 
 **Created & Developed by Baizid Al Hamid**
 
-This guide provides step-by-step instructions for broadcasting **Dead Again - Revamped (Twitch Edition)** live on Twitch using OBS Studio, configuring audience participation, and managing dual-monitor controls.
+This guide provides step-by-step instructions for broadcasting **Dead Again - Revamped (Twitch Edition) v1.3.0** live on Twitch using OBS Studio, configuring audience participation, and managing dual-monitor controls.
 
 ---
 
@@ -32,6 +32,8 @@ Dead Again - Revamped (Twitch Edition) is a standalone native application that t
 | **Unthrottled 60 FPS** | `backgroundThrottling: false` | Keeps game rendering at 60 FPS even when focusing other windows. |
 | **Instant Twitch Bridge** | Built-in IRC client | Connects to chat in seconds by typing your channel name. |
 | **Audience Tug-of-War** | Real-time Karma Engine | Chat commands spawn zombies or airdrop supplies dynamically. |
+| **Endless Nightmare Gauntlet** | Escalating multi-room mode (Level 5 unlock) | Unlimited audience boss summoning (`!boss`), enrage surges, and care package drops. |
+| **In-Game Cheat-Sheet** | In-game HUD overlay (`[C]`) | Live visual feedback when viewers execute chat commands. |
 
 ---
 
@@ -161,9 +163,10 @@ Audience commands are parsed locally by the relay engine and triggered in real t
 
 - **In-Game Cheat-Sheet Overlay (`[C]` / `[SELECT]`)**: Press **`[C]`** on keyboard or **`[SELECT]`** (Back) on gamepad at any time during combat or while paused to toggle the non-modal Twitch Chat Commands Cheat-Sheet card. When collapsed, the overlay renders 0 pixels on screen for 100% webcam and gameplay clearance.
 - **Docking Side Flip (`Shift+C` / Pause Menu)**: Press **`Shift+C`** or click **`[DOCK: RIGHT / LEFT]`** in the Pause Menu (`ESC` / `P`) to flip the cheat-sheet card between the Bottom-Right and Bottom-Left safe margins to accommodate your webcam layout. Both visibility and docking preferences are automatically saved across sessions.
+- **Nightmare Gauntlet Boss Encounters**: In Endless Nightmare Mode, audience `!boss` commands can summon up to 5 concurrent Heavy Boss Zombies with enrage mechanics and minion summon pulses. Encourage your chat to coordinate `!boss` alongside `!frenzy`!
 - **Ergonomic Run & Application Controls**:
   - **`[ QUIT TO MAIN MENU ]`**: Available inside the in-game Pause Menu (`ESC` / `P`) to immediately abandon an active run and return cleanly to the title screen.
-  - **`[ EXIT GAME ]`**: Available on the Start Screen below `[H] HOW TO PLAY & GUIDE` to cleanly shut down the desktop application and background relay server.
+  - **`[ EXIT GAME ]`**: Available on the Start Screen below `[H] HOW TO PLAY & GUIDE` and `[C] CREDITS` to cleanly shut down the desktop application and background relay server.
 
 ---
 
