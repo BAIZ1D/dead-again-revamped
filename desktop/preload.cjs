@@ -25,5 +25,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   openExternalUrl: (url) => {
     ipcRenderer.send('desktop:open-external', url);
-  }
+  },
+  exitApp: () => {
+    ipcRenderer.send('desktop:exit-app');
+  },
 });

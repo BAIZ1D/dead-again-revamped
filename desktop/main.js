@@ -76,6 +76,10 @@ async function initApp() {
     }
   });
 
+  ipcMain.on('desktop:exit-app', () => {
+    app.quit();
+  });
+
   // 5. Initialize background update checker
   initUpdateChecker(windowManager);
 }
