@@ -331,7 +331,8 @@ class Enemy extends Mob {
 		}
 
 		// splatter on mob
-		for (let d = dam; d--; ) {
+		let woundCount = Math.max(1, Math.round(dam));
+		for (let d = woundCount; d--; ) {
 			let wound = { pos: pos.subtract(this.pos).scale(0.33), pattern: [] };
 			wound.pos = wound.pos.add(randInCircle(0.2));
 

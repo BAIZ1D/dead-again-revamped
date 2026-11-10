@@ -1367,7 +1367,8 @@ function playSoundOccluded(sound, pos, baseVol = 1, pitch = 1) {
 			vol *= 0.6; // -40% muffling (D-32)
 		}
 	}
-	sound.play(pos, vol, pitch);
+	let playPos = (typeof mainCanvas !== 'undefined' && mainCanvas && mainCanvas.width) ? pos : undefined;
+	sound.play(playPos, vol, pitch);
 }
 
 function soundPlayExtra(sound, pos, vol, pitch, rand = 0, delay = 0, repeat = 1, initDelay=0) {
@@ -4539,7 +4540,8 @@ class Enemy extends Mob {
 		}
 
 		// splatter on mob
-		for (let d = dam; d--; ) {
+		let woundCount = Math.max(1, Math.round(dam));
+		for (let d = woundCount; d--; ) {
 			let wound = { pos: pos.subtract(this.pos).scale(0.33), pattern: [] };
 			wound.pos = wound.pos.add(randInCircle(0.2));
 
