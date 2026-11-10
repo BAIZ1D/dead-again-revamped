@@ -113,6 +113,7 @@ class APGManager {
 		this.ambientFrenzyTimer = rand(2700, 3600) | 0;
 		this.ambientTelegraphFired = false;
 		this.bottomHudAlpha = 1.0;
+		this.commandLastTriggered = {};
 		this.commandPulseFrames = {};
 		this.cheatSheetFlare = { color: null, frames: 0, maxFrames: 0 };
 		this.resetForNewLevel();
@@ -141,6 +142,7 @@ class APGManager {
 		this.ambientFrenzyTimer = rand(2700, 3600) | 0;
 		this.ambientTelegraphFired = false;
 		this.bottomHudAlpha = 1.0;
+		this.commandLastTriggered = {};
 		this.commandPulseFrames = {};
 		this.cheatSheetFlare = { color: null, frames: 0, maxFrames: 0 };
 		this.clearActiveEffects();
@@ -260,11 +262,14 @@ class APGManager {
 		let action = String((data && data.action) || "").toLowerCase();
 		let curFrame = typeof frame !== "undefined" ? frame : 0;
 		if (action && action !== "divine_flash" && (typeof g_state === "undefined" || g_state === STATE_PLAYING)) {
-			this.commandLastTriggered[action] = curFrame;
 			this.commandPulseFrames[action] = 45; // D-13, D-15
 		}
 
 		if (typeof g_state === "undefined" || g_state !== STATE_PLAYING || !g_player || g_player.hp <= 0) return;
+
+		if (action && action !== "divine_flash") {
+			this.commandLastTriggered[action] = curFrame;
+		}
 
 		let team = data && data.team === "bad" ? "bad" : "good";
 		let rawUser = String((data && data.user) || "Chat").trim().replace(/^@+/, "") || "Chat";
