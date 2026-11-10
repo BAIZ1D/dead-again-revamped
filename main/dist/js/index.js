@@ -6829,6 +6829,7 @@ function clearPushers() {
 
 let g_startEmbers = [];
 let g_startHelpOpen = false;
+let g_startCreditsOpen = false;
 let g_startHelpTab = 0; // 0: Combat & Weapons, 1: Twitch APG & Karma, 2: Streamer Setup
 let g_startLaunchTimer = 0;
 let g_startFlashFrames = 0;
@@ -6839,6 +6840,7 @@ let g_startUserInteracted = false;
 let g_startWindTimer = 780; // 13s initial procedural wind cadence (720-960 frames, D-23)
 let g_startHoverCTA = false;
 let g_startHoverGuide = false;
+let g_startHoverCredits = false;
 var g_startHoverExit = false;
 
 // Tab Pitch Multiplier Table for Compendium Navigation Chirps (D-24)
@@ -8064,24 +8066,43 @@ function renderStartScreenBadges(cx, H, u, safeW) {
     overlayContext.fillText(ctaText, 0, 0);
     overlayContext.restore();
 
-    // 3. Secondary CTA: "[H] HOW TO PLAY & GUIDE" Button (D-11, D-26)
-    const guideY = H * 0.83;
-    const guideW = Math.min(safeW * 0.50, u * 15);
-    const guideH = Math.min(u * 1.6, H * 0.044);
-    const guideGlowAlpha = g_startHoverGuide ? 0.85 : 0.45;
+    // 3. Symmetrical Dual Buttons: "[H] HOW TO PLAY & GUIDE" and "[C] CREDITS" at H * 0.83 (D-01, D-05)
+    const rowY = H * 0.83;
+    const btnW = Math.min(safeW * 0.38, u * 11);
+    const btnH = Math.min(u * 1.6, H * 0.044);
+    const gap = Math.max(8, u * 0.8);
+    const guideX = cx - btnW / 2 - gap / 2;
+    const creditsX = cx + btnW / 2 + gap / 2;
 
+    // Left Button: [H] HOW TO PLAY & GUIDE
+    const guideGlowAlpha = g_startHoverGuide ? 0.85 : 0.45;
     overlayContext.save();
     overlayContext.fillStyle = 'rgba(22, 27, 34, 0.88)';
-    overlayContext.fillRect(cx - guideW / 2, guideY - guideH / 2, guideW, guideH);
+    overlayContext.fillRect(guideX - btnW / 2, rowY - btnH / 2, btnW, btnH);
     overlayContext.strokeStyle = '#FBF236';
     overlayContext.lineWidth = 1.4;
     overlayContext.shadowColor = `rgba(251, 242, 54, ${guideGlowAlpha})`;
     overlayContext.shadowBlur = g_startHoverGuide ? 12 : 4;
-    overlayContext.strokeRect(cx - guideW / 2, guideY - guideH / 2, guideW, guideH);
+    overlayContext.strokeRect(guideX - btnW / 2, rowY - btnH / 2, btnW, btnH);
     overlayContext.shadowBlur = 0;
     overlayContext.restore();
 
-    drawTextWithOutline("[H] HOW TO PLAY & GUIDE", vec2(cx, guideY), Math.max(11, u * 0.62), colorSpark);
+    drawTextWithOutline("[H] HOW TO PLAY & GUIDE", vec2(guideX, rowY), Math.max(11, u * 0.58), colorSpark);
+
+    // Right Button: [C] CREDITS
+    const creditsGlowAlpha = g_startHoverCredits ? 0.85 : 0.45;
+    overlayContext.save();
+    overlayContext.fillStyle = 'rgba(22, 27, 34, 0.88)';
+    overlayContext.fillRect(creditsX - btnW / 2, rowY - btnH / 2, btnW, btnH);
+    overlayContext.strokeStyle = '#D4AF37';
+    overlayContext.lineWidth = 1.4;
+    overlayContext.shadowColor = `rgba(212, 175, 55, ${creditsGlowAlpha})`;
+    overlayContext.shadowBlur = g_startHoverCredits ? 12 : 4;
+    overlayContext.strokeRect(creditsX - btnW / 2, rowY - btnH / 2, btnW, btnH);
+    overlayContext.shadowBlur = 0;
+    overlayContext.restore();
+
+    drawTextWithOutline("[C] CREDITS", vec2(creditsX, rowY), Math.max(11, u * 0.58), colorSpark);
 
     // 3b. Application Exit Button: "[ EXIT GAME ]" (D-25, D-26)
     const exitY = H * 0.88;
@@ -8626,6 +8647,145 @@ function renderFieldManualModal(W, H, cx, cy, u, safeW, safeH) {
     renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH);
 }
 
+// Dedicated Start Screen Credits Modal honoring creators and technologies with zero legalese (D-01..D-05)
+function renderCreditsModal(W, H, cx, cy, u, safeW, safeH) {
+    if (typeof overlayContext === 'undefined' || !overlayContext || !g_startCreditsOpen) return;
+
+    overlayContext.save();
+
+    // 1. Semi-transparent dark slate backdrop scrim (D-04)
+    overlayContext.fillStyle = 'rgba(5, 2, 4, 0.78)';
+    overlayContext.fillRect(0, 0, W, H);
+
+    // 2. Terminal Card Container
+    const modalW = Math.min(safeW * 0.88, Math.max(880, u * 30));
+    const modalH = Math.min(safeH * 0.82, Math.max(560, u * 20));
+    const modalX = cx - modalW / 2;
+    const modalY = cy - modalH / 2;
+
+    // Dark slate panel
+    overlayContext.fillStyle = 'rgba(16, 20, 26, 0.96)';
+    overlayContext.fillRect(modalX, modalY, modalW, modalH);
+
+    // Outer ornate gold border
+    overlayContext.strokeStyle = '#D4AF37';
+    overlayContext.lineWidth = 2.0;
+    overlayContext.strokeRect(modalX, modalY, modalW, modalH);
+
+    // Inner crimson hairline
+    overlayContext.strokeStyle = '#AC3232';
+    overlayContext.lineWidth = 1.0;
+    overlayContext.strokeRect(modalX + 4, modalY + 4, modalW - 8, modalH - 8);
+
+    // Corner accent rivets in gold
+    overlayContext.fillStyle = '#D4AF37';
+    overlayContext.fillRect(modalX + 6, modalY + 6, 4, 4);
+    overlayContext.fillRect(modalX + modalW - 10, modalY + 6, 4, 4);
+    overlayContext.fillRect(modalX + 6, modalY + modalH - 10, 4, 4);
+    overlayContext.fillRect(modalX + modalW - 10, modalY + modalH - 10, 4, 4);
+
+    // 3. Modal Header
+    const headerY = modalY + u * 1.3;
+    overlayContext.font = `bold ${Math.max(13, u * 0.82)}px ${fontDefault}`;
+    overlayContext.textAlign = 'left';
+    overlayContext.textBaseline = 'middle';
+    overlayContext.fillStyle = '#FBF236';
+    overlayContext.fillText("★ CREDITS & ACKNOWLEDGMENTS", modalX + u * 1.0, headerY);
+
+    overlayContext.font = `bold ${Math.max(11, u * 0.58)}px ${fontDefault}`;
+    overlayContext.textAlign = 'right';
+    overlayContext.fillStyle = '#E8DDFF';
+    overlayContext.fillText("[ESC / X] RETURN TO START", modalX + modalW - u * 1.0, headerY);
+
+    // 4. Section 1: Lead Creator Hero Card (D-02)
+    const heroBoxX = modalX + u * 1.2;
+    const heroBoxY = modalY + u * 2.2;
+    const heroBoxW = modalW - u * 2.4;
+    const heroBoxH = u * 3.4;
+
+    overlayContext.fillStyle = 'rgba(24, 28, 36, 0.92)';
+    overlayContext.fillRect(heroBoxX, heroBoxY, heroBoxW, heroBoxH);
+    overlayContext.strokeStyle = '#D4AF37';
+    overlayContext.lineWidth = 1.4;
+    overlayContext.strokeRect(heroBoxX, heroBoxY, heroBoxW, heroBoxH);
+
+    // Corner rivets on hero box
+    overlayContext.fillStyle = '#FBF236';
+    overlayContext.fillRect(heroBoxX + 3, heroBoxY + 3, 3, 3);
+    overlayContext.fillRect(heroBoxX + heroBoxW - 6, heroBoxY + 3, 3, 3);
+    overlayContext.fillRect(heroBoxX + 3, heroBoxY + heroBoxH - 6, 3, 3);
+    overlayContext.fillRect(heroBoxX + heroBoxW - 6, heroBoxY + heroBoxH - 6, 3, 3);
+
+    overlayContext.textAlign = 'center';
+    overlayContext.textBaseline = 'middle';
+    overlayContext.font = `bold ${Math.max(13, u * 0.78)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#FBF236';
+    overlayContext.fillText("CREATED & REVAMPED BY BAIZID AL HAMID", cx, heroBoxY + heroBoxH * 0.38);
+
+    overlayContext.font = `${Math.max(10, u * 0.52)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#E8DDFF';
+    overlayContext.fillText("Game Design • Twitch APG Architecture • Combat Overhaul • Pixel Art", cx, heroBoxY + heroBoxH * 0.72);
+
+    // 5. Sections 2, 3, 4: Categorized Attribution Panels
+    const cardY = heroBoxY + heroBoxH + u * 0.8;
+    const cardH = (modalY + modalH - u * 2.0 - cardY) / 3;
+    const cardW = modalW - u * 2.4;
+    const cardX = modalX + u * 1.2;
+
+    const sections = [
+        {
+            title: "ORIGINAL GAME CONCEPT & SOUNDTRACK",
+            line1: "Jonas Olmstead (sanojian) & Jesper Rasmussen (repsej) — Original Game Creators",
+            line2: "Andrei Moskvitin Josephsen — Original Game Soundtrack"
+        },
+        {
+            title: "TECHNOLOGIES & SOUND SYNTHESIS",
+            line1: "LittleJS 2D Engine — Frank Force",
+            line2: "ZzFX Micro Sound Synthesizer — Frank Force & Keith Clark"
+        },
+        {
+            title: "STREAMING ARCHITECTURE & INTEGRATION",
+            line1: "Twurple (@twurple/api, @twurple/auth) — Twitch Helix & EventSub API",
+            line2: "tmi.js — Twitch IRC Real-Time Chat Engine"
+        }
+    ];
+
+    for (let s = 0; s < sections.length; s++) {
+        const sec = sections[s];
+        const sy = cardY + s * cardH;
+
+        overlayContext.fillStyle = 'rgba(20, 24, 32, 0.70)';
+        overlayContext.fillRect(cardX, sy, cardW, cardH - u * 0.35);
+        overlayContext.strokeStyle = 'rgba(212, 175, 55, 0.30)';
+        overlayContext.lineWidth = 1.0;
+        overlayContext.strokeRect(cardX, sy, cardW, cardH - u * 0.35);
+
+        // Section Title
+        overlayContext.textAlign = 'left';
+        overlayContext.textBaseline = 'top';
+        overlayContext.font = `bold ${Math.max(11, u * 0.58)}px ${fontDefault}`;
+        overlayContext.fillStyle = '#FFC837';
+        overlayContext.fillText(sec.title, cardX + u * 0.8, sy + u * 0.45);
+
+        // Section Body Lines
+        overlayContext.font = `${Math.max(10, u * 0.50)}px ${fontDefault}`;
+        overlayContext.fillStyle = '#FFFFFF';
+        overlayContext.fillText(sec.line1, cardX + u * 1.0, sy + u * 1.25);
+        overlayContext.fillStyle = '#C8D2DE';
+        overlayContext.fillText(sec.line2, cardX + u * 1.0, sy + u * 1.95);
+    }
+
+    // 6. Footer Banner (Twitch Purple, 100% Free & Open-Source Spectator Survival Shooter)
+    const footerY = modalY + modalH - u * 1.0;
+    overlayContext.textAlign = 'center';
+    overlayContext.textBaseline = 'middle';
+    overlayContext.font = `bold ${Math.max(11, u * 0.56)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#9146FF';
+    overlayContext.fillText("100% Free & Open-Source Spectator Survival Shooter", cx, footerY);
+
+    overlayContext.restore();
+}
+
 function playStartTabChirp(tabIndex) {
     const pitch = START_TAB_PITCH_RATES[tabIndex] || 1.0;
     const sPos = (typeof cameraPos !== 'undefined' && cameraPos) ? cameraPos : vec2(0, 0);
@@ -8731,9 +8891,58 @@ function updateStartScreen() {
     const clicked = (typeof mouseWasPressed !== 'undefined') ? mouseWasPressed(0) : false;
     if (clicked) g_startUserInteracted = true;
 
+    if (g_startCreditsOpen) {
+        g_startHoverCTA = false;
+        g_startHoverGuide = false;
+        g_startHoverCredits = false;
+        g_startHoverExit = false;
+        if (mainCanvas && mainCanvas.style) mainCanvas.style.cursor = 'default';
+
+        const modalW = Math.min(safeW * 0.88, Math.max(880, u * 30));
+        const modalH = Math.min(safeH * 0.82, Math.max(560, u * 20));
+        const modalX = cx - modalW / 2;
+        const modalY = cy - modalH / 2;
+
+        if (mPos && mainCanvas && mainCanvas.style) {
+            if (mPos.x >= modalX + modalW - u * 8.0 && mPos.x <= modalX + modalW - u * 0.5 && mPos.y >= modalY + u * 0.5 && mPos.y <= modalY + u * 2.2) {
+                mainCanvas.style.cursor = 'pointer';
+            }
+        }
+
+        // Mouse click detection inside/outside Credits modal
+        if (clicked && mPos) {
+            // Close button click (top right) or clicking outside modal backdrop
+            if (mPos.x < modalX || mPos.x > modalX + modalW || mPos.y < modalY || mPos.y > modalY + modalH || (mPos.y <= modalY + u * 2.2 && mPos.x >= modalX + modalW - u * 8.0)) {
+                g_startCreditsOpen = false;
+                playStartTabChirp(0);
+                return;
+            }
+        }
+
+        // Keyboard: Esc (27), 'X' (88), or 'C' (67) closes Credits modal
+        if (typeof keyWasPressed !== 'undefined') {
+            if (keyWasPressed(27) || keyWasPressed(88) || keyWasPressed(67)) {
+                g_startCreditsOpen = false;
+                playStartTabChirp(0);
+                return;
+            }
+        }
+
+        // Gamepad: B (1) or Y (3) closes Credits modal
+        if (typeof gamepadWasPressed !== 'undefined') {
+            if (gamepadWasPressed(1) || gamepadWasPressed(3)) {
+                g_startCreditsOpen = false;
+                playStartTabChirp(0);
+                return;
+            }
+        }
+        return;
+    }
+
     if (g_startHelpOpen) {
         g_startHoverCTA = false;
         g_startHoverGuide = false;
+        g_startHoverCredits = false;
         g_startHoverExit = false;
         if (mainCanvas && mainCanvas.style) mainCanvas.style.cursor = 'default';
 
@@ -8797,9 +9006,12 @@ function updateStartScreen() {
     const ctaW = Math.min(safeW * 0.65, u * 17);
     const ctaH = u * 2.3;
 
-    const guideY = H * 0.83;
-    const guideW = Math.min(safeW * 0.50, u * 15);
-    const guideH = Math.min(u * 1.6, H * 0.044);
+    const rowY = H * 0.83;
+    const btnW = Math.min(safeW * 0.38, u * 11);
+    const btnH = Math.min(u * 1.6, H * 0.044);
+    const gap = Math.max(8, u * 0.8);
+    const guideX = cx - btnW / 2 - gap / 2;
+    const creditsX = cx + btnW / 2 + gap / 2;
 
     const exitY = H * 0.88;
     const exitW = Math.min(safeW * 0.42, u * 12);
@@ -8809,15 +9021,16 @@ function updateStartScreen() {
         g_startMoonPulseFrames--;
     }
 
-    // Hover state detection for CTA cartouche, [H] button, [ EXIT GAME ], and Moon (D-25, D-26)
+    // Hover state detection for CTA cartouche, [H] button, [C] button, [ EXIT GAME ], and Moon (D-25, D-26)
     const { moonX, moonY, moonR } = getStartMoonMetrics(W, H, u, safeW, safeH);
     if (mPos) {
         g_startHoverCTA = Math.abs(mPos.x - cx) < ctaW / 2 && Math.abs(mPos.y - ctaY) < ctaH / 2;
-        g_startHoverGuide = Math.abs(mPos.x - cx) < guideW / 2 && Math.abs(mPos.y - guideY) < guideH / 2;
+        g_startHoverGuide = Math.abs(mPos.x - guideX) < btnW / 2 && Math.abs(mPos.y - rowY) < btnH / 2;
+        g_startHoverCredits = Math.abs(mPos.x - creditsX) < btnW / 2 && Math.abs(mPos.y - rowY) < btnH / 2;
         g_startHoverExit = Math.abs(mPos.x - cx) < exitW / 2 && Math.abs(mPos.y - exitY) < exitH / 2;
         const hoverMoon = Math.hypot(mPos.x - moonX, mPos.y - moonY) <= moonR * 1.35;
         if (mainCanvas && mainCanvas.style) {
-            if (g_startHoverCTA || g_startHoverGuide || g_startHoverExit || hoverMoon) {
+            if (g_startHoverCTA || g_startHoverGuide || g_startHoverCredits || g_startHoverExit || hoverMoon) {
                 mainCanvas.style.cursor = 'pointer';
             } else {
                 mainCanvas.style.cursor = 'default';
@@ -8850,11 +9063,17 @@ function updateStartScreen() {
             }
             return;
         }
-        // Clicked Help Button
-        if (Math.abs(mPos.x - cx) < guideW / 2 && Math.abs(mPos.y - guideY) < guideH / 2) {
+        // Clicked Guide Button
+        if (Math.abs(mPos.x - guideX) < btnW / 2 && Math.abs(mPos.y - rowY) < btnH / 2) {
             g_startHelpOpen = true;
             g_startModalSpringFrames = 4;
             playStartTabChirp(g_startHelpTab);
+            return;
+        }
+        // Clicked Credits Button
+        if (Math.abs(mPos.x - creditsX) < btnW / 2 && Math.abs(mPos.y - rowY) < btnH / 2) {
+            g_startCreditsOpen = true;
+            playStartTabChirp(0);
             return;
         }
         // Clicked CTA Cartouche
@@ -8864,7 +9083,7 @@ function updateStartScreen() {
         }
     }
 
-    // Keyboard: Enter (13) or Space (32) starts; H (72) opens Help
+    // Keyboard: Enter (13) or Space (32) starts; H (72) opens Help; C (67) opens Credits
     if (typeof keyWasPressed !== 'undefined') {
         if (keyWasPressed(13) || keyWasPressed(32)) {
             g_startUserInteracted = true;
@@ -8876,6 +9095,12 @@ function updateStartScreen() {
             g_startHelpOpen = true;
             g_startModalSpringFrames = 4;
             playStartTabChirp(g_startHelpTab);
+            return;
+        }
+        if (keyWasPressed(67)) {
+            g_startUserInteracted = true;
+            g_startCreditsOpen = true;
+            playStartTabChirp(0);
             return;
         }
     }
@@ -8958,6 +9183,11 @@ function renderStartScreen() {
     // Step 14: Field Manual Modal Overlay (when open, g_startHelpOpen, D-17, D-22)
     if (g_startHelpOpen) {
         renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH);
+    }
+
+    // Step 14b: Credits Modal Overlay (when open, g_startCreditsOpen, D-01..D-05)
+    if (g_startCreditsOpen) {
+        renderCreditsModal(W, H, cx, cy, u, safeW, safeH);
     }
 
     // Step 15: Enhanced 12-Frame Phosphor Flash Wipe with Blood-Crimson Vignette Decay (D-17, D-21)
