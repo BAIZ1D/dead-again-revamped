@@ -334,6 +334,7 @@ const simulations = `
 
 	const origUiDrawRectScreen = uiDrawRectScreen;
 	const origDrawTextWithOutline = drawTextWithOutline;
+	const origApgNetwork = typeof g_apgNetwork !== 'undefined' ? g_apgNetwork : undefined;
 
 	for (const vp of viewports) {
 		mockCanvas.width = vp.W;
@@ -414,6 +415,7 @@ const simulations = `
 
 	uiDrawRectScreen = origUiDrawRectScreen;
 	drawTextWithOutline = origDrawTextWithOutline;
+	g_apgNetwork = origApgNetwork;
 	console.log('  Passed: Vote lock banner and all supporting lobby strings strictly contained across all 7 viewports.');
 
 	// -------------------------------------------------------------
