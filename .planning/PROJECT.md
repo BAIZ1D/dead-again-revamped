@@ -89,8 +89,8 @@ A high-stakes, real-time tug-of-war between streamer survival and audience sabot
 - **Version:** v1.2.0 (Shipped)
 - **Repository:** Unified single repo `BAIZ1D/dead-again-revamped`
 - **License:** GNU Affero General Public License v3.0 (AGPL-3.0)
-- **Test Status:** 100% green across all 10 test suites (Phase 21, 20, 19, 18, 17, 16, 15, 13, 12, Packaging, Distribution) including 7-viewport multi-resolution Canvas 2D VM verification.
-- **Milestones Completed:** v1.0, v1.1, v1.2, v1.3, v1.4, v1.5 (Phases 19, 20, 21 of v1.6 complete).
+- **Test Status:** 100% green across all 11 test suites (Phase 22, 21, 20, 19, 18, 17, 16, 15, 13, 12, Packaging, Distribution) including 7-viewport multi-resolution Canvas 2D VM verification.
+- **Milestones Completed:** v1.0, v1.1, v1.2, v1.3, v1.4, v1.5 (Phases 19, 20, 21, 22 of v1.6 complete).
 
 ## Current Milestone: v1.6 UI Clipping Fixes, Retro Visuals & Endless Nightmare Mode (Release v1.3.0)
 
@@ -119,6 +119,7 @@ A high-stakes, real-time tug-of-war between streamer survival and audience sabot
 - CLIP-04, CLIP-05, CLIP-06 HUD Ergonomics, Banner Containment & Field Manual Text-Wrapping Engine (3/3) -- Phase 19 (v1.6)
 - HELP-01, HELP-02, HELP-03 Field Manual Arsenal & Bestiary Compendium Completion (3/3) -- Phase 20 (v1.6)
 - VIS-02, VIS-03, VIS-04 16-Bit Retro Arcade Start Screen Visual Overhaul (3/3) -- Phase 21 (v1.6)
+- HUD-05, HUD-06 In-Game Stream Command Cheat-Sheet & Streamer Ergonomics (2/2) -- Phase 22 (v1.6)
 
 ### Active
 
@@ -127,7 +128,7 @@ A high-stakes, real-time tug-of-war between streamer survival and audience sabot
 - [x] Field manual / Help modal text layout and wrapping across all tabs contained within bounds (`CLIP-06` -- Phase 19)
 - [x] Complete arsenal and bestiary documented in Help tabs (all 4 guns and all enemy types) (`HELP-01..03` -- Phase 20)
 - [x] 16-bit retro pixel art start screen backdrop and title treatment matching core game aesthetic (`VIS-02..04` -- Phase 21)
-- [ ] In-game stream-visible Good/Bad chat commands cheat-sheet overlay positioned in bottom-right margin with hotkey toggle
+- [x] In-game stream-visible Good/Bad chat commands cheat-sheet overlay positioned in bottom-right margin with hotkey toggle (`HUD-05..06` -- Phase 22)
 - [ ] Endless multi-room Nightmare Level progression after Level 5 with all weapons scattered in starting rooms, escalating waves, 5-boss audience cap, and survival scoring
 - [ ] Semantic version v1.3.0 bump across manifests and full test suite verification
 
@@ -163,4 +164,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-10 after Phase 21 completion (Milestone v1.6)*
+*Last updated: 2026-11-10 after Phase 22 completion (Milestone v1.6)*
