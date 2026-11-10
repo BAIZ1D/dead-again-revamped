@@ -671,8 +671,8 @@ function gameRenderPost() {
 			const mBtnH = u * 1.8;
 			const btnW = mBtnW;
 			const btnH = mBtnH;
-			const mX = mousePosScreen ? mousePosScreen.x : (mousePos ? mousePos.x : 0);
-			const mY = mousePosScreen ? mousePosScreen.y : (mousePos ? mousePos.y : 0);
+			const mX = (typeof mousePosScreen !== 'undefined' && mousePosScreen) ? mousePosScreen.x : -1;
+			const mY = (typeof mousePosScreen !== 'undefined' && mousePosScreen) ? mousePosScreen.y : -1;
 			const manualHover = Math.abs(mX - cx) < mBtnW / 2 && Math.abs(mY - manualY) < mBtnH / 2;
 			uiDrawRectScreen(vec2(cx, manualY), vec2(mBtnW, mBtnH), manualHover ? colorBullet.scale(0.4) : colorWhite.scale(0.12));
 			drawTextWithOutline("[H] SURVIVOR FIELD MANUAL", vec2(cx, manualY), u * 0.75, manualHover ? colorSpark : colorWhite);
