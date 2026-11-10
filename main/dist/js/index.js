@@ -7022,10 +7022,8 @@ function gameRenderPost() {
 		// make sure UI can fit onto screen
 		let scaleUI = min(1, overlayCanvas.width / (12 * cameraScale));
 
-		pos = vec2(
-			cameraPos.x - overlayCanvas.width / (cameraScale * 2) + 6 * scaleUI,
-			cameraPos.y + overlayCanvas.height / (cameraScale * 2) - scaleUI
-		);
+		pos.x = cameraPos.x - overlayCanvas.width / (cameraScale * 2) + 6.5 * scaleUI;
+		pos.y = cameraPos.y + overlayCanvas.height / (cameraScale * 2) - scaleUI;
 
 		// UI background
 		drawRect(pos, vec2(8, 2).scale(scaleUI), colorWhite.scale(0.4));
@@ -7040,9 +7038,9 @@ function gameRenderPost() {
 			colorWhite.scale(0.7)
 		);
 
-		// 3-Heart / Golden Shield Pips relocated beneath avatar portrait (HUD-04, D-04, D-05, D-06)
+		// 3-Heart / Golden Shield Pips relocated beneath avatar portrait (HUD-04, CLIP-04, D-01, D-02, D-04, D-05, D-06)
 		const platePos = vec2(pos.x - 5.0 * scaleUI, pos.y - 1.35 * scaleUI);
-		const plateSize = vec2(2.7, 0.65).scale(scaleUI);
+		const plateSize = vec2(2.4, 0.65).scale(scaleUI);
 
 		// Armored backing plate (D-04)
 		drawRect(platePos, plateSize, new Color(0, 0, 0, 0.45));
@@ -7053,9 +7051,11 @@ function gameRenderPost() {
 			drawRect(platePos, plateSize.add(vec2(0.1 * scaleUI)), colorBlood.scale(ghostPulse));
 		}
 
+		const pipStartX = pos.x - (5.975 * scaleUI - 0.195 * scaleUI);
+		const pipPitch = 0.52 * scaleUI;
 		for (let i = 0; i < 4; i++) {
-			// Centered horizontally across X in [pos.x - 5.975 * scaleUI, pos.x - 4.025 * scaleUI] (D-04)
-			let pipPos = vec2(pos.x - 5.975 * scaleUI + i * 0.65 * scaleUI, pos.y - 1.35 * scaleUI);
+			// Centered horizontally across X in [pos.x - 5.78 * scaleUI, pos.x - 4.22 * scaleUI] (CLIP-04, D-01, D-02, D-04)
+			let pipPos = vec2(pipStartX + i * pipPitch, pos.y - 1.35 * scaleUI);
 			let pipType = "empty";
 			if (i < 3) {
 				pipType = g_player.hp >= i + 1 ? "heart" : "empty";
