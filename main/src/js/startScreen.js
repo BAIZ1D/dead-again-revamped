@@ -730,69 +730,134 @@ function renderHelpTabWeapons(x, y, w, h, u) {
     drawWrappedText(overlayContext, "3 Base Hearts + 1 Golden Shield Pip (!repair, 4 HP cap). 0.75s (45f) post-hit grace with radial knockback pusher; 1 HP triggers heartbeat alarm. Map Supply Crates yield +8B / +3S / +2R. Floor weapon swap refunds chamber ammo. Next stage starting reserves clamp to 18 Bullets / 4 Shells / 3 Rifle.", x + u * 0.6, footY + u * 0.95, w - u * 1.2, Math.max(9.5, u * 0.42), footH - u * 0.9);
 }
 
-// Tab 2: Twitch APG Karma, Commands & Mob Threat Cards (CLIP-06, D-07)
+// Tab 2: Bestiary Dossiers, Boss Siege Intel & Horde Strip (CLIP-06, HELP-02, D-05, D-06)
 function renderHelpTabTwitch(x, y, w, h, u) {
-    // Karma Meter Explanation
-    overlayContext.font = `bold ${Math.max(11, u * 0.62)}px ${fontDefault}`;
     overlayContext.textAlign = 'left';
-    overlayContext.fillStyle = '#FBF236';
-    overlayContext.fillText("TWITCH TUG-OF-WAR KARMA ENGINE", x, y + u * 0.6);
+    overlayContext.textBaseline = 'alphabetic';
 
-    overlayContext.font = `${Math.max(9, u * 0.46)}px ${fontDefault}`;
-    overlayContext.fillStyle = '#C8D1DC';
-    drawWrappedText(overlayContext, "Audience votes & chat events shift the live Karma balance between GOOD (Survivor) and BAD (Horde).", x, y + u * 1.3, w, u * 0.52);
-
-    // Command Cheat Sheet Box
-    const cmdY = y + u * 2.0;
-    const cmdH = u * 3.8;
-    overlayContext.fillStyle = 'rgba(22, 27, 34, 0.75)';
-    overlayContext.fillRect(x, cmdY, w, cmdH);
-    overlayContext.strokeStyle = 'rgba(212, 175, 55, 0.35)';
-    overlayContext.strokeRect(x, cmdY, w, cmdH);
-
-    overlayContext.font = `bold ${Math.max(10, u * 0.52)}px ${fontDefault}`;
-    overlayContext.fillStyle = '#4ADE80';
-    drawWrappedText(overlayContext, "GOOD TEAM COMMANDS: !buff (Speed/Damage), !drop / !ammo (Supply Drop), !heal (Clutch Shield)", x + u * 0.8, cmdY + u * 0.8, w - u * 1.6, u * 0.48);
-
-    overlayContext.fillStyle = '#FF4D4D';
-    drawWrappedText(overlayContext, "BAD TEAM COMMANDS: !sabotage (Jam Gun), !frenzy (Blood Surge), !zombie (Spawn Horde)", x + u * 0.8, cmdY + u * 1.8, w - u * 1.6, u * 0.48);
-
-    overlayContext.fillStyle = '#9146FF';
-    drawWrappedText(overlayContext, "CLUTCH EVENTS: Karma ≥85% unlocks DIVINE FLASH (Board Stun) or BLOOD SURGE (Nightmare Swarm)", x + u * 0.8, cmdY + u * 2.8, w - u * 1.6, u * 0.48);
-
-    // Mob Threat Cards
-    const mobY = cmdY + cmdH + u * 0.8;
-    overlayContext.font = `bold ${Math.max(11, u * 0.58)}px ${fontDefault}`;
-    overlayContext.fillStyle = '#FBF236';
-    overlayContext.fillText("MOB THREAT INTEL", x, mobY);
+    const cardW = (w - u * 0.8) / 2;
+    const cardH = (h - u * 2.8) / 2;
 
     const mobs = [
-        { name: "ZOMBIE", speed: "Normal", threat: "Swarm", face: tileNumbers_faceZombie },
-        { name: "VAMPIRE", speed: "Very Fast", threat: "Flanker", face: tileNumbers_faceVampire },
-        { name: "GHOST", speed: "Phasing", threat: "Wall-Clipper", face: tileNumbers_ghost }
+        {
+            name: "WALKER ZOMBIE",
+            pill: "SWARM MELEE",
+            pillColor: "#FF4D4D",
+            borderColor: "#3B5323",
+            face: tileNumbers_faceZombie,
+            telemetry: "HP: 2 | SPEED: 0.06 (Normal) | DROP: 5% Scavenged (+2B/+1S/+1R)",
+            desc: "Rises from graves (4.0s) or !mob portals (1.2s telegraph). Swarms in packs and bashes closed doors after 3.0s (180f). Kite along corridors with Pistol or 3-round SMG tap-bursts."
+        },
+        {
+            name: "AERIAL VAMPIRE / BAT",
+            pill: "DIVE FLANKER",
+            pillColor: "#FF4D4D",
+            borderColor: "#8B0000",
+            face: tileNumbers_faceVampire,
+            telemetry: "HP: 1 (Bat) → 6+ (Vampire) | SPEED: 0.20 (Fast) | DROP: 10% Scavenged",
+            desc: "Dives at high speed in 1 HP Bat form. On player contact, flashes premonition skull, flees for 2.0s, and transforms into a tanky 6+ HP Vampire. Eliminate in 1 HP Bat form before transformation completes."
+        },
+        {
+            name: "PHASING GHOST",
+            pill: "WALL-PHASER",
+            pillColor: "#4A6984",
+            borderColor: "#4A6984",
+            face: tileNumbers_ghost,
+            telemetry: "HP: 1 | SPEED: 0.05 (Phasing) | DROP: 12% Scavenged",
+            desc: "Cycles between intangible (30% alpha — clips through walls/doors, immune to bullets) and solid (100% alpha — vulnerable) every 0.5–2.0s (30–120f). Hold fire until opaque. Divine Flash forces ghosts solid."
+        },
+        {
+            name: "HEAVY BOSS ZOMBIE",
+            pill: "SIEGE BOSS",
+            pillColor: "#FF4D4D",
+            borderColor: "#D4AF37",
+            face: tileNumbers_beefyZombie,
+            telemetry: "HP: 22+ (Stage) / 12+4·Lvl (!boss) | MASS: 12 | DROP: Full Care Package",
+            desc: "Tears chunks out of interior walls and doors (1.0s windup) to hurl spinning Boulders (0.2 speed) that crush cover. Max 2 active audience bosses. Defeating any Boss guarantees a Full Care Package (+4B / +2S / +1R)."
+        }
     ];
 
-    const mCardW = (w - u * 0.8) / 3;
-    for (let i = 0; i < 3; i++) {
-        const mx = x + i * (mCardW + u * 0.4);
-        const my = mobY + u * 0.4;
+    for (let i = 0; i < 4; i++) {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const cx = x + col * (cardW + u * 0.8);
+        const cy = y + row * (cardH + u * 0.4);
         const mob = mobs[i];
 
-        overlayContext.fillStyle = 'rgba(22, 27, 34, 0.65)';
-        overlayContext.fillRect(mx, my, mCardW, u * 3.0);
-        overlayContext.strokeStyle = 'rgba(172, 50, 50, 0.45)';
-        overlayContext.strokeRect(mx, my, mCardW, u * 3.0);
+        // Card container
+        overlayContext.fillStyle = 'rgba(22, 27, 34, 0.75)';
+        overlayContext.fillRect(cx, cy, cardW, cardH);
+        overlayContext.strokeStyle = 'rgba(212, 175, 55, 0.35)';
+        overlayContext.strokeRect(cx, cy, cardW, cardH);
 
-        drawOverlayTile(mob.face, mx + u * 1.0, my + u * 1.5, u * 2.0, 0, false, 1.0);
+        // Framed portrait badge
+        const badgeSize = u * 2.4;
+        const badgeX = cx + u * 0.6;
+        const badgeY = cy + u * 0.4;
+        overlayContext.fillStyle = 'rgba(10, 14, 20, 0.80)';
+        overlayContext.fillRect(badgeX, badgeY, badgeSize, badgeSize);
+        overlayContext.strokeStyle = mob.borderColor;
+        overlayContext.lineWidth = 1.5;
+        overlayContext.strokeRect(badgeX, badgeY, badgeSize, badgeSize);
 
-        overlayContext.font = `bold ${Math.max(10, u * 0.50)}px ${fontDefault}`;
-        overlayContext.fillStyle = '#FF4D4D';
-        overlayContext.fillText(mob.name, mx + u * 2.4, my + u * 0.9);
+        // Badge sprite
+        overlayContext.save();
+        if (mob.face === tileNumbers_ghost) {
+            overlayContext.globalAlpha = 0.85;
+        }
+        drawOverlayTile(mob.face, cx + u * 1.8, cy + u * 1.6, u * 2.2, 0, false, 1.0);
+        overlayContext.restore();
 
-        overlayContext.font = `${Math.max(9, u * 0.42)}px ${fontDefault}`;
+        // Title
+        overlayContext.font = `bold ${Math.max(10.5, u * 0.54)}px ${fontDefault}`;
+        overlayContext.fillStyle = '#FBF236';
+        overlayContext.textAlign = 'left';
+        overlayContext.fillText(mob.name, cx + u * 3.3, cy + u * 0.75);
+
+        // Threat Pill Box
+        const pillW = Math.max(70, u * 3.8);
+        const pillH = u * 0.65;
+        const pillX = cx + cardW - pillW - u * 0.6;
+        const pillY = cy + u * 0.35;
+        overlayContext.fillStyle = 'rgba(10, 14, 20, 0.85)';
+        overlayContext.fillRect(pillX, pillY, pillW, pillH);
+        overlayContext.strokeStyle = mob.pillColor;
+        overlayContext.lineWidth = 1.0;
+        overlayContext.strokeRect(pillX, pillY, pillW, pillH);
+
+        overlayContext.font = `bold ${Math.max(7.5, u * 0.36)}px ${fontDefault}`;
+        overlayContext.fillStyle = mob.pillColor;
+        overlayContext.textAlign = 'center';
+        overlayContext.fillText(mob.pill, pillX + pillW / 2, pillY + pillH * 0.72);
+        overlayContext.textAlign = 'left';
+
+        // Telemetry line
+        overlayContext.font = `bold ${Math.max(8.0, u * 0.40)}px ${fontDefault}`;
+        overlayContext.fillStyle = '#D4AF37';
+        overlayContext.fillText(mob.telemetry, cx + u * 3.3, cy + u * 1.45);
+
+        // Description / behavioral tactics
+        overlayContext.font = `${Math.max(8.5, u * 0.42)}px ${fontDefault}`;
         overlayContext.fillStyle = '#C8D1DC';
-        drawWrappedText(overlayContext, "SPEED: " + mob.speed + "\nTACTIC: " + mob.threat, mx + u * 2.4, my + u * 1.5, mCardW - u * 2.6, u * 0.46);
+        drawWrappedText(overlayContext, mob.desc, cx + u * 0.7, cy + u * 2.05, cardW - u * 1.4, Math.max(9.5, u * 0.44), cardH - u * 2.3);
     }
+
+    // Horde Progression & Ammo Despawn Footer Strip
+    const footY = y + cardH * 2 + u * 0.6;
+    const footH = h - (footY - y);
+    overlayContext.fillStyle = 'rgba(22, 27, 34, 0.75)';
+    overlayContext.fillRect(x, footY, w, footH);
+    overlayContext.strokeStyle = 'rgba(212, 175, 55, 0.30)';
+    overlayContext.lineWidth = 1.0;
+    overlayContext.strokeRect(x, footY, w, footH);
+
+    overlayContext.font = `bold ${Math.max(9.5, u * 0.46)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#A78BFA';
+    overlayContext.fillText("HORDE PROGRESSION & AMMO DESPAWN INTEL", x + u * 0.6, footY + u * 0.55);
+
+    overlayContext.font = `${Math.max(8.5, u * 0.40)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#C8D1DC';
+    drawWrappedText(overlayContext, "Active Mob Concurrency Caps: 15 (L1), 18 (L2), 20 (L3), 23 (L4), 25 (L5). Autonomous Ambient Frenzy triggers every 45–60s (2.0s red telegraph + 6.0s surge at +60% speed). Despawn Lifespans: Scavenged Clips 25s, Care Packages 30s. Both flash rapidly at 7.5Hz during final 5.0s.", x + u * 0.6, footY + u * 0.95, w - u * 1.2, Math.max(9.5, u * 0.42), footH - u * 0.9);
 }
 
 // Tab 3: Streamer Dashboard & OBS Integration (CLIP-06, D-07)
