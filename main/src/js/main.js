@@ -307,22 +307,24 @@ function gameUpdate() {
 
 	if (g_state == STATE_PLAYING) {
 		// Cheat-sheet hotkeys: [C] toggle, Shift+C dock flip, Gamepad Select (8) toggle (D-07, D-10, D-19)
-		if (typeof gamepadWasPressed !== 'undefined' && gamepadWasPressed(8)) {
-			g_cheatsheetVisible = !g_cheatsheetVisible;
-			safeSetPref('da_cheatsheet_visible', g_cheatsheetVisible ? '1' : '0');
-			uiSound(1);
-		}
-		if (keyWasPressed(67)) {
-			if (keyIsDown(16)) {
-				// Shift+C: Flip docking between Right and Left (D-10)
-				g_cheatsheetDock = g_cheatsheetDock === 'right' ? 'left' : 'right';
-				safeSetPref('da_cheatsheet_dock', g_cheatsheetDock);
-				uiSound(1);
-			} else {
-				// [C]: Toggle visibility (D-07)
+		if (typeof g_startHelpOpen === 'undefined' || !g_startHelpOpen) {
+			if (typeof gamepadWasPressed !== 'undefined' && gamepadWasPressed(8)) {
 				g_cheatsheetVisible = !g_cheatsheetVisible;
 				safeSetPref('da_cheatsheet_visible', g_cheatsheetVisible ? '1' : '0');
 				uiSound(1);
+			}
+			if (keyWasPressed(67)) {
+				if (keyIsDown(16)) {
+					// Shift+C: Flip docking between Right and Left (D-10)
+					g_cheatsheetDock = g_cheatsheetDock === 'right' ? 'left' : 'right';
+					safeSetPref('da_cheatsheet_dock', g_cheatsheetDock);
+					uiSound(1);
+				} else {
+					// [C]: Toggle visibility (D-07)
+					g_cheatsheetVisible = !g_cheatsheetVisible;
+					safeSetPref('da_cheatsheet_visible', g_cheatsheetVisible ? '1' : '0');
+					uiSound(1);
+				}
 			}
 		}
 

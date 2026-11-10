@@ -82,7 +82,20 @@ function abandonRunToMainMenu() {
 	g_splatter = [];
 	g_holes = [];
 	g_moss = [];
+	g_shells = [];
+	g_shadows = {};
+	enemiesSpawned = 0;
+	ammoCooldownFrames = 0;
+	if (typeof enemySpawnTimer !== 'undefined' && enemySpawnTimer.set) {
+		enemySpawnTimer.set(999);
+	}
+	if (typeof engineObjectsDestroy === 'function') {
+		engineObjectsDestroy();
+	}
 	uiFadeOutAndCall(() => {
+		if (typeof engineObjectsDestroy === 'function') {
+			engineObjectsDestroy();
+		}
 		startNewGame();
 		changeState(STATE_CLICK_TO_START);
 	});
@@ -294,22 +307,24 @@ function gameUpdate() {
 
 	if (g_state == STATE_PLAYING) {
 		// Cheat-sheet hotkeys: [C] toggle, Shift+C dock flip, Gamepad Select (8) toggle (D-07, D-10, D-19)
-		if (typeof gamepadWasPressed !== 'undefined' && gamepadWasPressed(8)) {
-			g_cheatsheetVisible = !g_cheatsheetVisible;
-			safeSetPref('da_cheatsheet_visible', g_cheatsheetVisible ? '1' : '0');
-			uiSound(1);
-		}
-		if (keyWasPressed(67)) {
-			if (keyIsDown(16)) {
-				// Shift+C: Flip docking between Right and Left (D-10)
-				g_cheatsheetDock = g_cheatsheetDock === 'right' ? 'left' : 'right';
-				safeSetPref('da_cheatsheet_dock', g_cheatsheetDock);
-				uiSound(1);
-			} else {
-				// [C]: Toggle visibility (D-07)
+		if (typeof g_startHelpOpen === 'undefined' || !g_startHelpOpen) {
+			if (typeof gamepadWasPressed !== 'undefined' && gamepadWasPressed(8)) {
 				g_cheatsheetVisible = !g_cheatsheetVisible;
 				safeSetPref('da_cheatsheet_visible', g_cheatsheetVisible ? '1' : '0');
 				uiSound(1);
+			}
+			if (keyWasPressed(67)) {
+				if (keyIsDown(16)) {
+					// Shift+C: Flip docking between Right and Left (D-10)
+					g_cheatsheetDock = g_cheatsheetDock === 'right' ? 'left' : 'right';
+					safeSetPref('da_cheatsheet_dock', g_cheatsheetDock);
+					uiSound(1);
+				} else {
+					// [C]: Toggle visibility (D-07)
+					g_cheatsheetVisible = !g_cheatsheetVisible;
+					safeSetPref('da_cheatsheet_visible', g_cheatsheetVisible ? '1' : '0');
+					uiSound(1);
+				}
 			}
 		}
 
@@ -1744,6 +1759,7 @@ class APGManager {
 		this.ambientFrenzyTimer = rand(2700, 3600) | 0;
 		this.ambientTelegraphFired = false;
 		this.bottomHudAlpha = 1.0;
+		this.commandLastTriggered = {};
 		this.commandPulseFrames = {};
 		this.cheatSheetFlare = { color: null, frames: 0, maxFrames: 0 };
 		this.resetForNewLevel();
@@ -1772,6 +1788,7 @@ class APGManager {
 		this.ambientFrenzyTimer = rand(2700, 3600) | 0;
 		this.ambientTelegraphFired = false;
 		this.bottomHudAlpha = 1.0;
+		this.commandLastTriggered = {};
 		this.commandPulseFrames = {};
 		this.cheatSheetFlare = { color: null, frames: 0, maxFrames: 0 };
 		this.clearActiveEffects();
@@ -1891,11 +1908,14 @@ class APGManager {
 		let action = String((data && data.action) || "").toLowerCase();
 		let curFrame = typeof frame !== "undefined" ? frame : 0;
 		if (action && action !== "divine_flash" && (typeof g_state === "undefined" || g_state === STATE_PLAYING)) {
-			this.commandLastTriggered[action] = curFrame;
 			this.commandPulseFrames[action] = 45; // D-13, D-15
 		}
 
 		if (typeof g_state === "undefined" || g_state !== STATE_PLAYING || !g_player || g_player.hp <= 0) return;
+
+		if (action && action !== "divine_flash") {
+			this.commandLastTriggered[action] = curFrame;
+		}
 
 		let team = data && data.team === "bad" ? "bad" : "good";
 		let rawUser = String((data && data.user) || "Chat").trim().replace(/^@+/, "") || "Chat";
@@ -7015,7 +7035,7 @@ function renderStartScreenBadges(cx, H, u, safeW) {
     // 3. Secondary CTA: "[H] HOW TO PLAY & GUIDE" Button (D-11, D-26)
     const guideY = H * 0.83;
     const guideW = Math.min(safeW * 0.50, u * 15);
-    const guideH = u * 1.7;
+    const guideH = Math.min(u * 1.6, H * 0.044);
     const guideGlowAlpha = g_startHoverGuide ? 0.85 : 0.45;
 
     overlayContext.save();
@@ -7034,7 +7054,7 @@ function renderStartScreenBadges(cx, H, u, safeW) {
     // 3b. Application Exit Button: "[ EXIT GAME ]" (D-25, D-26)
     const exitY = H * 0.88;
     const exitW = Math.min(safeW * 0.42, u * 12);
-    const exitH = u * 1.5;
+    const exitH = Math.min(u * 1.4, H * 0.042);
     const exitGlowAlpha = g_startHoverExit ? 0.85 : 0.45;
 
     overlayContext.save();
@@ -7682,6 +7702,7 @@ function updateStartScreen() {
     if (g_startHelpOpen) {
         g_startHoverCTA = false;
         g_startHoverGuide = false;
+        g_startHoverExit = false;
         if (mainCanvas && mainCanvas.style) mainCanvas.style.cursor = 'default';
 
         // Field Manual Modal Input Routing (CLIP-06, D-06: synchronized HiDPI bounds)
@@ -7746,11 +7767,11 @@ function updateStartScreen() {
 
     const guideY = H * 0.83;
     const guideW = Math.min(safeW * 0.50, u * 15);
-    const guideH = u * 1.7;
+    const guideH = Math.min(u * 1.6, H * 0.044);
 
     const exitY = H * 0.88;
     const exitW = Math.min(safeW * 0.42, u * 12);
-    const exitH = u * 1.5;
+    const exitH = Math.min(u * 1.4, H * 0.042);
 
     if (g_startMoonPulseFrames > 0) {
         g_startMoonPulseFrames--;
@@ -8595,8 +8616,8 @@ function gameRenderPost() {
 			const mBtnH = u * 1.8;
 			const btnW = mBtnW;
 			const btnH = mBtnH;
-			const mX = mousePosScreen ? mousePosScreen.x : (mousePos ? mousePos.x : 0);
-			const mY = mousePosScreen ? mousePosScreen.y : (mousePos ? mousePos.y : 0);
+			const mX = (typeof mousePosScreen !== 'undefined' && mousePosScreen) ? mousePosScreen.x : -1;
+			const mY = (typeof mousePosScreen !== 'undefined' && mousePosScreen) ? mousePosScreen.y : -1;
 			const manualHover = Math.abs(mX - cx) < mBtnW / 2 && Math.abs(mY - manualY) < mBtnH / 2;
 			uiDrawRectScreen(vec2(cx, manualY), vec2(mBtnW, mBtnH), manualHover ? colorBullet.scale(0.4) : colorWhite.scale(0.12));
 			drawTextWithOutline("[H] SURVIVOR FIELD MANUAL", vec2(cx, manualY), u * 0.75, manualHover ? colorSpark : colorWhite);
