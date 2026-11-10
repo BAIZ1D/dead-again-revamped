@@ -1,6 +1,6 @@
 /** @format */
 
-// Start Screen Modular Engine (Phase 17, VIS-01)
+// Start Screen Modular Engine (Phase 17, Phase 21, VIS-01..VIS-04)
 // 0 KB external asset overhead: 100% procedural Canvas 2D + LittleJS tiles
 
 let g_startEmbers = [];
@@ -9,6 +9,165 @@ let g_startHelpTab = 0; // 0: Combat & Weapons, 1: Twitch APG & Karma, 2: Stream
 let g_startLaunchTimer = 0;
 let g_startFlashFrames = 0;
 let g_startGamepadDebounce = false;
+let g_startMoonPulseFrames = 0;
+
+// Classic 4x4 Bayer Ordered Dither Matrix normalized [0..15] / 16 (D-11)
+const START_BAYER_4X4 = [
+    0 / 16,  8 / 16,  2 / 16, 10 / 16,
+   12 / 16,  4 / 16, 14 / 16,  6 / 16,
+    3 / 16, 11 / 16,  1 / 16,  9 / 16,
+   15 / 16,  7 / 16, 13 / 16,  5 / 16
+];
+
+// 3 Procedural Shaded Lunar Craters: [dxRatio, dyRatio, radiusRatio, depth] (D-12)
+const START_MOON_CRATERS = [
+    [-0.22,  0.14, 0.30, 0.85], // Primary impact basin
+    [ 0.28, -0.20, 0.17, 0.70], // Upper-right crater pit
+    [ 0.14,  0.36, 0.14, 0.65]  // Lower-right crater pit
+];
+
+// Compute Lunar Center & Radius Clamped to 16:9 Safe Zone (D-09, D-20)
+function getStartMoonMetrics(W, H, u, safeW, safeH) {
+    const sw = safeW || W;
+    const sh = safeH || H;
+    const offsetX = (W - sw) / 2;
+    const offsetY = (H - sh) / 2;
+    const moonX = offsetX + sw * 0.76;
+    const moonY = offsetY + sh * 0.21;
+    const moonR = u * 3.7;
+    return { moonX, moonY, moonR };
+}
+
+// Procedural 16-Bit Bayer-Dithered Blood/Harvest Moon & Twin Halo Rings (VIS-03, D-09..D-12, D-25)
+function renderStartMoon(cx, cy, u, W, H, safeW, safeH) {
+    if (typeof overlayContext === 'undefined' || !overlayContext) return;
+    overlayContext.save();
+
+    const { moonX, moonY, moonR } = getStartMoonMetrics(W, H, u, safeW, safeH);
+    const step = Math.max(2, Math.round(u / 8));
+    const breathAlpha = 0.12 + 0.08 * Math.sin(frame * 0.03);
+
+    // 1. Twin Concentric Breathing Halo Glow Rings (1.55 * moonR and 1.25 * moonR, D-12)
+    const outerHaloR = 1.55 * moonR;
+    const innerHaloR = 1.25 * moonR;
+
+    overlayContext.fillStyle = `rgba(234, 88, 12, ${(breathAlpha * 0.55).toFixed(3)})`;
+    overlayContext.beginPath();
+    overlayContext.arc(moonX, moonY, outerHaloR, 0, Math.PI * 2);
+    overlayContext.fill();
+
+    overlayContext.strokeStyle = `rgba(245, 158, 11, ${(breathAlpha * 0.90).toFixed(3)})`;
+    overlayContext.lineWidth = Math.max(1.5, step * 0.6);
+    overlayContext.stroke();
+
+    overlayContext.fillStyle = `rgba(253, 224, 71, ${(breathAlpha * 0.85).toFixed(3)})`;
+    overlayContext.beginPath();
+    overlayContext.arc(moonX, moonY, innerHaloR, 0, Math.PI * 2);
+    overlayContext.fill();
+
+    overlayContext.strokeStyle = `rgba(253, 224, 71, ${Math.min(1, breathAlpha * 1.25).toFixed(3)})`;
+    overlayContext.lineWidth = Math.max(1.5, step * 0.75);
+    overlayContext.stroke();
+
+    // 2. Interactive Easter Egg: 10-Frame Chromatic Corona Flare Rings (D-25)
+    if (g_startMoonPulseFrames > 0) {
+        const pulseProgress = (10 - g_startMoonPulseFrames) / 10;
+        const flareR1 = moonR * (1.15 + pulseProgress * 0.95);
+        const flareR2 = moonR * (1.05 + pulseProgress * 0.65);
+        const flareAlpha = (g_startMoonPulseFrames / 10) * 0.85;
+
+        overlayContext.save();
+        overlayContext.strokeStyle = '#FF4D4D';
+        overlayContext.lineWidth = Math.max(2, step * 1.2);
+        overlayContext.globalAlpha = flareAlpha;
+        overlayContext.beginPath();
+        overlayContext.arc(moonX, moonY, flareR1, 0, Math.PI * 2);
+        overlayContext.stroke();
+
+        overlayContext.strokeStyle = '#FBF236';
+        overlayContext.lineWidth = Math.max(1.5, step * 0.9);
+        overlayContext.beginPath();
+        overlayContext.arc(moonX, moonY, flareR2, 0, Math.PI * 2);
+        overlayContext.stroke();
+        overlayContext.restore();
+    }
+
+    // 3. Bayer 4x4 Ordered Dithered Lunar Disk & 3 Shaded Craters (D-10, D-11, D-12)
+    // Blood/Harvest Hybrid Palette stops (0: sunlit upper-left -> 4: deep burgundy lower-right)
+    const palette = ['#FDE047', '#F59E0B', '#EA580C', '#7F1D1D', '#450A0A'];
+    const craterFloors = ['#2B070E', '#1E050A'];
+
+    const rSq = moonR * moonR;
+    const startX = Math.floor((moonX - moonR) / step) * step;
+    const endX = Math.ceil((moonX + moonR) / step) * step;
+    const startY = Math.floor((moonY - moonR) / step) * step;
+    const endY = Math.ceil((moonY + moonR) / step) * step;
+
+    for (let py = startY; py <= endY; py += step) {
+        const dy = py + step * 0.5 - moonY;
+        const dySq = dy * dy;
+        const by = ((py / step) & 3) << 2;
+
+        for (let px = startX; px <= endX; px += step) {
+            const dx = px + step * 0.5 - moonX;
+            const distSq = dx * dx + dySq;
+            if (distSq > rSq) continue;
+
+            const nx = dx / moonR;
+            const ny = dy / moonR;
+            const bayerThreshold = START_BAYER_4X4[by + ((px / step) & 3)];
+
+            // Check 3 procedural craters
+            let inCrater = 0;
+            let onCraterRim = false;
+            for (let c = 0; c < 3; c++) {
+                const crater = START_MOON_CRATERS[c];
+                const cdx = nx - crater[0];
+                const cdy = ny - crater[1];
+                const cDist = Math.sqrt(cdx * cdx + cdy * cdy);
+                const cRad = crater[2];
+                if (cDist < cRad * 0.78) {
+                    inCrater = c + 1;
+                    break;
+                } else if (cDist < cRad * 1.06) {
+                    onCraterRim = true;
+                }
+            }
+
+            if (inCrater > 0) {
+                overlayContext.fillStyle = (bayerThreshold < 0.45) ? craterFloors[0] : craterFloors[1];
+                overlayContext.fillRect(px, py, step, step);
+                continue;
+            }
+
+            // Directional terminator shading: upper-left (-0.7, -0.7) is sunlit gold (0.0), lower-right is crimson shadow (1.0)
+            let shade = (nx * 0.68 + ny * 0.72 + 1.0) * 0.5;
+            // Spherical limb darkening near edge
+            const edgeRatio = distSq / rSq;
+            shade = shade * 0.82 + edgeRatio * 0.24;
+            if (onCraterRim) shade = Math.min(1.0, shade + 0.28);
+            if (g_startMoonPulseFrames > 0) shade = Math.min(1.0, shade + 0.18);
+            shade = Math.max(0, Math.min(0.999, shade));
+
+            const scaled = shade * (palette.length - 1);
+            const bandIdx = scaled | 0;
+            const frac = scaled - bandIdx;
+            const colorIdx = (frac > bayerThreshold && bandIdx < palette.length - 1) ? bandIdx + 1 : bandIdx;
+
+            overlayContext.fillStyle = palette[colorIdx];
+            overlayContext.fillRect(px, py, step, step);
+        }
+    }
+
+    // 4. Illuminated Upper-Left Lunar Rim Highlight (#FDE047)
+    overlayContext.strokeStyle = '#FDE047';
+    overlayContext.lineWidth = Math.max(1.2, step * 0.5);
+    overlayContext.beginPath();
+    overlayContext.arc(moonX, moonY, moonR, Math.PI * 0.85, Math.PI * 1.65);
+    overlayContext.stroke();
+
+    overlayContext.restore();
+}
 
 // 16:9 Virtual Safe Zone Clamping (D-15)
 function getStartScreenSafeZone(canvasW, canvasH) {
@@ -1199,8 +1358,23 @@ function updateStartScreen() {
     const guideW = Math.min(safeW * 0.50, u * 15);
     const guideH = u * 1.7;
 
+    if (g_startMoonPulseFrames > 0) {
+        g_startMoonPulseFrames--;
+    }
+
     // Mouse click detection
     if (clicked && mPos) {
+        // Clicked Moon Easter Egg (D-25)
+        const { moonX, moonY, moonR } = getStartMoonMetrics(W, H, u, safeW, safeH);
+        const moonDist = Math.hypot(mPos.x - moonX, mPos.y - moonY);
+        if (moonDist <= moonR * 1.35) {
+            g_startMoonPulseFrames = 10;
+            const sPos = (typeof cameraPos !== 'undefined' && cameraPos) ? cameraPos : vec2(0, 0);
+            if (typeof soundEnemyGroan !== 'undefined' && soundEnemyGroan && soundEnemyGroan.play) {
+                soundEnemyGroan.play(sPos, 0.35, 1.4);
+            }
+            return;
+        }
         // Clicked Help Button
         if (Math.abs(mPos.x - cx) < guideW / 2 && Math.abs(mPos.y - guideY) < guideH / 2) {
             g_startHelpOpen = true;
