@@ -1209,7 +1209,7 @@ function renderStartScreenBadges(cx, H, u, safeW) {
     // 3. Secondary CTA: "[H] HOW TO PLAY & GUIDE" Button (D-11, D-26)
     const guideY = H * 0.83;
     const guideW = Math.min(safeW * 0.50, u * 15);
-    const guideH = u * 1.7;
+    const guideH = Math.min(u * 1.6, H * 0.044);
     const guideGlowAlpha = g_startHoverGuide ? 0.85 : 0.45;
 
     overlayContext.save();
@@ -1228,7 +1228,7 @@ function renderStartScreenBadges(cx, H, u, safeW) {
     // 3b. Application Exit Button: "[ EXIT GAME ]" (D-25, D-26)
     const exitY = H * 0.88;
     const exitW = Math.min(safeW * 0.42, u * 12);
-    const exitH = u * 1.5;
+    const exitH = Math.min(u * 1.4, H * 0.042);
     const exitGlowAlpha = g_startHoverExit ? 0.85 : 0.45;
 
     overlayContext.save();
@@ -1940,11 +1940,11 @@ function updateStartScreen() {
 
     const guideY = H * 0.83;
     const guideW = Math.min(safeW * 0.50, u * 15);
-    const guideH = u * 1.7;
+    const guideH = Math.min(u * 1.6, H * 0.044);
 
     const exitY = H * 0.88;
     const exitW = Math.min(safeW * 0.42, u * 12);
-    const exitH = u * 1.5;
+    const exitH = Math.min(u * 1.4, H * 0.042);
 
     if (g_startMoonPulseFrames > 0) {
         g_startMoonPulseFrames--;
