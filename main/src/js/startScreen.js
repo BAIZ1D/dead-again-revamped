@@ -645,7 +645,7 @@ function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight, maxHeight) {
     };
 }
 
-// Tab 1: Weapon Stat Cards & Health Telemetry
+// Tab 1: Weapon Stat Cards & Health Telemetry (CLIP-06, D-07)
 function renderHelpTabWeapons(x, y, w, h, u) {
     const cardW = (w - u * 0.8) / 2;
     const cardH = (h - u * 1.8) / 2;
@@ -708,7 +708,7 @@ function renderHelpTabWeapons(x, y, w, h, u) {
 
         overlayContext.font = `${Math.max(9, u * 0.44)}px ${fontDefault}`;
         overlayContext.fillStyle = '#C8D1DC';
-        overlayContext.fillText(wep.desc, cx + u * 0.8, cy + cardH - u * 0.5);
+        drawWrappedText(overlayContext, wep.desc, cx + u * 0.8, cy + u * 2.3, cardW - u * 1.2, u * 0.52, cardH - u * 2.6);
     }
 
     // Health Telemetry Footer
@@ -716,10 +716,10 @@ function renderHelpTabWeapons(x, y, w, h, u) {
     overlayContext.font = `bold ${Math.max(10, u * 0.52)}px ${fontDefault}`;
     overlayContext.textAlign = 'left';
     overlayContext.fillStyle = '#FF4D4D';
-    overlayContext.fillText("HEALTH & SURVIVAL: 3 Base Hearts + 1 Golden Shield Pip. 1 HP triggers critical danger pulse.", x + u * 0.5, footY);
+    drawWrappedText(overlayContext, "HEALTH & SURVIVAL: 3 Base Hearts + 1 Golden Shield Pip. 1 HP triggers critical danger pulse.", x + u * 0.5, footY, w - u * 1.0, u * 0.52);
 }
 
-// Tab 2: Twitch APG Karma, Commands & Mob Threat Cards
+// Tab 2: Twitch APG Karma, Commands & Mob Threat Cards (CLIP-06, D-07)
 function renderHelpTabTwitch(x, y, w, h, u) {
     // Karma Meter Explanation
     overlayContext.font = `bold ${Math.max(11, u * 0.62)}px ${fontDefault}`;
@@ -729,7 +729,7 @@ function renderHelpTabTwitch(x, y, w, h, u) {
 
     overlayContext.font = `${Math.max(9, u * 0.46)}px ${fontDefault}`;
     overlayContext.fillStyle = '#C8D1DC';
-    overlayContext.fillText("Audience votes & chat events shift the live Karma balance between GOOD (Survivor) and BAD (Horde).", x, y + u * 1.3);
+    drawWrappedText(overlayContext, "Audience votes & chat events shift the live Karma balance between GOOD (Survivor) and BAD (Horde).", x, y + u * 1.3, w, u * 0.52);
 
     // Command Cheat Sheet Box
     const cmdY = y + u * 2.0;
@@ -741,13 +741,13 @@ function renderHelpTabTwitch(x, y, w, h, u) {
 
     overlayContext.font = `bold ${Math.max(10, u * 0.52)}px ${fontDefault}`;
     overlayContext.fillStyle = '#4ADE80';
-    overlayContext.fillText("GOOD TEAM COMMANDS: !buff (Speed/Damage), !drop / !ammo (Supply Drop), !heal (Clutch Shield)", x + u * 0.8, cmdY + u * 1.0);
+    drawWrappedText(overlayContext, "GOOD TEAM COMMANDS: !buff (Speed/Damage), !drop / !ammo (Supply Drop), !heal (Clutch Shield)", x + u * 0.8, cmdY + u * 0.8, w - u * 1.6, u * 0.48);
 
     overlayContext.fillStyle = '#FF4D4D';
-    overlayContext.fillText("BAD TEAM COMMANDS: !sabotage (Jam Gun), !frenzy (Blood Surge), !zombie (Spawn Horde)", x + u * 0.8, cmdY + u * 2.2);
+    drawWrappedText(overlayContext, "BAD TEAM COMMANDS: !sabotage (Jam Gun), !frenzy (Blood Surge), !zombie (Spawn Horde)", x + u * 0.8, cmdY + u * 1.8, w - u * 1.6, u * 0.48);
 
     overlayContext.fillStyle = '#9146FF';
-    overlayContext.fillText("CLUTCH EVENTS: Karma ≥85% unlocks DIVINE FLASH (Board Stun) or BLOOD SURGE (Nightmare Swarm)", x + u * 0.8, cmdY + u * 3.2);
+    drawWrappedText(overlayContext, "CLUTCH EVENTS: Karma ≥85% unlocks DIVINE FLASH (Board Stun) or BLOOD SURGE (Nightmare Swarm)", x + u * 0.8, cmdY + u * 2.8, w - u * 1.6, u * 0.48);
 
     // Mob Threat Cards
     const mobY = cmdY + cmdH + u * 0.8;
@@ -776,16 +776,15 @@ function renderHelpTabTwitch(x, y, w, h, u) {
 
         overlayContext.font = `bold ${Math.max(10, u * 0.50)}px ${fontDefault}`;
         overlayContext.fillStyle = '#FF4D4D';
-        overlayContext.fillText(mob.name, mx + u * 2.4, my + u * 1.0);
+        overlayContext.fillText(mob.name, mx + u * 2.4, my + u * 0.9);
 
         overlayContext.font = `${Math.max(9, u * 0.42)}px ${fontDefault}`;
         overlayContext.fillStyle = '#C8D1DC';
-        overlayContext.fillText(`SPEED: ${mob.speed}`, mx + u * 2.4, my + u * 1.8);
-        overlayContext.fillText(`TACTIC: ${mob.threat}`, mx + u * 2.4, my + u * 2.5);
+        drawWrappedText(overlayContext, "SPEED: " + mob.speed + "\nTACTIC: " + mob.threat, mx + u * 2.4, my + u * 1.5, mCardW - u * 2.6, u * 0.46);
     }
 }
 
-// Tab 3: Streamer Dashboard & OBS Integration
+// Tab 3: Streamer Dashboard & OBS Integration (CLIP-06, D-07)
 function renderHelpTabStreamer(x, y, w, h, u) {
     overlayContext.font = `bold ${Math.max(11, u * 0.62)}px ${fontDefault}`;
     overlayContext.textAlign = 'left';
@@ -802,11 +801,12 @@ function renderHelpTabStreamer(x, y, w, h, u) {
 
     overlayContext.font = `bold ${Math.max(10, u * 0.55)}px ${fontDefault}`;
     overlayContext.fillStyle = '#9146FF';
-    overlayContext.fillText("1. STREAMER DASHBOARD (Cmd+D / Ctrl+D)", x + u * 0.8, y + u * 2.1);
+    overlayContext.fillText("1. STREAMER DASHBOARD (Cmd+D / Ctrl+D)", x + u * 0.8, y + u * 1.8);
 
+    const desc1 = "Open the companion dashboard to view live prediction wagers, trigger manual clutches, or simulate audience events.";
     overlayContext.font = `${Math.max(9, u * 0.46)}px ${fontDefault}`;
     overlayContext.fillStyle = '#C8D1DC';
-    overlayContext.fillText("Open the companion dashboard to view live prediction wagers, trigger manual clutches, or simulate audience events.", x + u * 0.8, y + u * 2.9);
+    drawWrappedText(overlayContext, desc1, x + u * 0.8, y + u * 2.5, w - u * 1.6, u * 0.52, cardH - u * 1.6);
 
     // Card 2: Prediction Lifecycle
     const y2 = y + u * 1.2 + cardH + u * 0.4;
@@ -817,11 +817,12 @@ function renderHelpTabStreamer(x, y, w, h, u) {
 
     overlayContext.font = `bold ${Math.max(10, u * 0.55)}px ${fontDefault}`;
     overlayContext.fillStyle = '#FBF236';
-    overlayContext.fillText("2. CHANNEL POINTS PREDICTION LIFECYCLE", x + u * 0.8, y2 + u * 0.9);
+    overlayContext.fillText("2. CHANNEL POINTS PREDICTION LIFECYCLE", x + u * 0.8, y2 + u * 0.8);
 
+    const desc2 = "Lobby opens prediction -> Locked on level start -> Automatically resolves payouts upon Victory or Player Death.";
     overlayContext.font = `${Math.max(9, u * 0.46)}px ${fontDefault}`;
     overlayContext.fillStyle = '#C8D1DC';
-    overlayContext.fillText("Lobby opens prediction -> Locked on level start -> Automatically resolves payouts upon Victory or Player Death.", x + u * 0.8, y2 + u * 1.7);
+    drawWrappedText(overlayContext, desc2, x + u * 0.8, y2 + u * 1.5, w - u * 1.6, u * 0.52, cardH - u * 1.6);
 
     // Card 3: OBS Studio Capture
     const y3 = y2 + cardH + u * 0.4;
@@ -832,11 +833,12 @@ function renderHelpTabStreamer(x, y, w, h, u) {
 
     overlayContext.font = `bold ${Math.max(10, u * 0.55)}px ${fontDefault}`;
     overlayContext.fillStyle = '#4ADE80';
-    overlayContext.fillText("3. ZERO-OVERLAY OBS CAPTURE", x + u * 0.8, y3 + u * 0.9);
+    overlayContext.fillText("3. ZERO-OVERLAY OBS CAPTURE", x + u * 0.8, y3 + u * 0.8);
 
+    const desc3 = "No external browser sources or overlays required. Add a Window/Game Capture in OBS targeting Dead Again.";
     overlayContext.font = `${Math.max(9, u * 0.46)}px ${fontDefault}`;
     overlayContext.fillStyle = '#C8D1DC';
-    overlayContext.fillText("No external browser sources or overlays required. Add a Window/Game Capture in OBS targeting Dead Again.", x + u * 0.8, y3 + u * 1.7);
+    drawWrappedText(overlayContext, desc3, x + u * 0.8, y3 + u * 1.5, w - u * 1.6, u * 0.52, cardH - u * 1.6);
 }
 
 // Tabbed In-Game Field Manual & Streamer Guide (D-11, D-12, D-17)
