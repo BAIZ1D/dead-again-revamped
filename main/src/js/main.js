@@ -82,7 +82,20 @@ function abandonRunToMainMenu() {
 	g_splatter = [];
 	g_holes = [];
 	g_moss = [];
+	g_shells = [];
+	g_shadows = {};
+	enemiesSpawned = 0;
+	ammoCooldownFrames = 0;
+	if (typeof enemySpawnTimer !== 'undefined' && enemySpawnTimer.set) {
+		enemySpawnTimer.set(999);
+	}
+	if (typeof engineObjectsDestroy === 'function') {
+		engineObjectsDestroy();
+	}
 	uiFadeOutAndCall(() => {
+		if (typeof engineObjectsDestroy === 'function') {
+			engineObjectsDestroy();
+		}
 		startNewGame();
 		changeState(STATE_CLICK_TO_START);
 	});
