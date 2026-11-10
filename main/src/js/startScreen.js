@@ -860,61 +860,115 @@ function renderHelpTabTwitch(x, y, w, h, u) {
     drawWrappedText(overlayContext, "Active Mob Concurrency Caps: 15 (L1), 18 (L2), 20 (L3), 23 (L4), 25 (L5). Autonomous Ambient Frenzy triggers every 45–60s (2.0s red telegraph + 6.0s surge at +60% speed). Despawn Lifespans: Scavenged Clips 25s, Care Packages 30s. Both flash rapidly at 7.5Hz during final 5.0s.", x + u * 0.6, footY + u * 0.95, w - u * 1.2, Math.max(9.5, u * 0.42), footH - u * 0.9);
 }
 
-// Tab 3: Streamer Dashboard & OBS Integration (CLIP-06, D-07)
+// Tab 3: Twitch APG 10-Command Matrix, Clutch Economy & Streamer Setup (CLIP-06, HELP-03, D-07, D-08)
 function renderHelpTabStreamer(x, y, w, h, u) {
-    overlayContext.font = `bold ${Math.max(11, u * 0.62)}px ${fontDefault}`;
     overlayContext.textAlign = 'left';
-    overlayContext.fillStyle = '#FBF236';
-    overlayContext.fillText("STREAMER SETUP & BROADCAST INSTRUCTIONS", x, y + u * 0.6);
+    overlayContext.textBaseline = 'alphabetic';
 
-    const cardH = (h - u * 1.5) / 3;
+    const colW = (w - u * 0.8) / 2;
+    const cmdBoxH = Math.floor(h * 0.58);
 
-    // Card 1: Dashboard Shortcut
+    // 1. Left Column: TEAM GOOD — 5 GUARDIAN COMMANDS
     overlayContext.fillStyle = 'rgba(22, 27, 34, 0.75)';
-    overlayContext.fillRect(x, y + u * 1.2, w, cardH);
-    overlayContext.strokeStyle = 'rgba(145, 70, 255, 0.55)';
-    overlayContext.strokeRect(x, y + u * 1.2, w, cardH);
+    overlayContext.fillRect(x, y, colW, cmdBoxH);
+    overlayContext.strokeStyle = 'rgba(74, 222, 128, 0.40)';
+    overlayContext.lineWidth = 1.0;
+    overlayContext.strokeRect(x, y, colW, cmdBoxH);
 
-    overlayContext.font = `bold ${Math.max(10, u * 0.55)}px ${fontDefault}`;
-    overlayContext.fillStyle = '#9146FF';
-    overlayContext.fillText("1. STREAMER DASHBOARD (Cmd+D / Ctrl+D)", x + u * 0.8, y + u * 1.8);
-
-    const desc1 = "Open the companion dashboard to view live prediction wagers, trigger manual clutches, or simulate audience events.";
-    overlayContext.font = `${Math.max(9, u * 0.46)}px ${fontDefault}`;
-    overlayContext.fillStyle = '#C8D1DC';
-    drawWrappedText(overlayContext, desc1, x + u * 0.8, y + u * 2.5, w - u * 1.6, u * 0.52, cardH - u * 1.6);
-
-    // Card 2: Prediction Lifecycle
-    const y2 = y + u * 1.2 + cardH + u * 0.4;
-    overlayContext.fillStyle = 'rgba(22, 27, 34, 0.75)';
-    overlayContext.fillRect(x, y2, w, cardH);
-    overlayContext.strokeStyle = 'rgba(212, 175, 55, 0.35)';
-    overlayContext.strokeRect(x, y2, w, cardH);
-
-    overlayContext.font = `bold ${Math.max(10, u * 0.55)}px ${fontDefault}`;
-    overlayContext.fillStyle = '#FBF236';
-    overlayContext.fillText("2. CHANNEL POINTS PREDICTION LIFECYCLE", x + u * 0.8, y2 + u * 0.8);
-
-    const desc2 = "Lobby opens prediction -> Locked on level start -> Automatically resolves payouts upon Victory or Player Death.";
-    overlayContext.font = `${Math.max(9, u * 0.46)}px ${fontDefault}`;
-    overlayContext.fillStyle = '#C8D1DC';
-    drawWrappedText(overlayContext, desc2, x + u * 0.8, y2 + u * 1.5, w - u * 1.6, u * 0.52, cardH - u * 1.6);
-
-    // Card 3: OBS Studio Capture
-    const y3 = y2 + cardH + u * 0.4;
-    overlayContext.fillStyle = 'rgba(22, 27, 34, 0.75)';
-    overlayContext.fillRect(x, y3, w, cardH);
-    overlayContext.strokeStyle = 'rgba(74, 222, 128, 0.45)';
-    overlayContext.strokeRect(x, y3, w, cardH);
-
-    overlayContext.font = `bold ${Math.max(10, u * 0.55)}px ${fontDefault}`;
+    overlayContext.font = `bold ${Math.max(10, u * 0.52)}px ${fontDefault}`;
     overlayContext.fillStyle = '#4ADE80';
-    overlayContext.fillText("3. ZERO-OVERLAY OBS CAPTURE", x + u * 0.8, y3 + u * 0.8);
+    overlayContext.fillText("TEAM GOOD — 5 GUARDIAN COMMANDS", x + u * 0.6, y + u * 0.55);
 
-    const desc3 = "No external browser sources or overlays required. Add a Window/Game Capture in OBS targeting Dead Again.";
-    overlayContext.font = `${Math.max(9, u * 0.46)}px ${fontDefault}`;
+    const goodCmds = [
+        { name: "!ammo", desc: "Drops primary Care Package (+4B / +2S / +1R, 30s life) + weapon upgrade roll (L3+ 10% Shotgun)." },
+        { name: "!barrier", desc: "Raises 6.0s octagonal rune push-barrier repelling nearby mobs." },
+        { name: "!repair", desc: "Grants +1 Golden Shield Pip (up to 4 HP), unjams gun & casts 10.0s one-way door wards." },
+        { name: "!slow", desc: "Chills all enemies (-50% speed for 8.0s) and cancels active Blood Frenzy." },
+        { name: "!light", desc: "Casts 10.0s full-arena illumination + player speed boost and clears Blackout." }
+    ];
+
+    const itemH = (cmdBoxH - u * 0.85) / 5;
+    for (let i = 0; i < 5; i++) {
+        const iy = y + u * 0.85 + i * itemH;
+        const cmd = goodCmds[i];
+
+        overlayContext.font = `bold ${Math.max(8.5, u * 0.42)}px ${fontDefault}`;
+        overlayContext.fillStyle = '#4ADE80';
+        overlayContext.fillText(cmd.name, x + u * 0.6, iy + u * 0.35);
+
+        overlayContext.font = `${Math.max(8.0, u * 0.38)}px ${fontDefault}`;
+        overlayContext.fillStyle = '#C8D1DC';
+        drawWrappedText(overlayContext, cmd.desc, x + u * 3.4, iy, colW - u * 4.0, Math.max(8.5, u * 0.38), itemH - u * 0.05);
+    }
+
+    // 2. Right Column: TEAM BAD — 5 SABOTEUR COMMANDS
+    const rx = x + colW + u * 0.8;
+    overlayContext.fillStyle = 'rgba(22, 27, 34, 0.75)';
+    overlayContext.fillRect(rx, y, colW, cmdBoxH);
+    overlayContext.strokeStyle = 'rgba(255, 77, 77, 0.40)';
+    overlayContext.lineWidth = 1.0;
+    overlayContext.strokeRect(rx, y, colW, cmdBoxH);
+
+    overlayContext.font = `bold ${Math.max(10, u * 0.52)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#FF4D4D';
+    overlayContext.fillText("TEAM BAD — 5 SABOTEUR COMMANDS", rx + u * 0.6, y + u * 0.55);
+
+    const badCmds = [
+        { name: "!mob", desc: "Spawns 1 zombie (L1–2) or perimeter pair (L3+) with 1.2s portal telegraph (enrages at cap)." },
+        { name: "!boss", desc: "Summons [Boss] @User Elite Mini-Boss (4.0s rate limit, max 2 active or empowers +4 HP at cap)." },
+        { name: "!jam", desc: "Mechanically jams active weapon, dumping cylinder into reserve and forcing a 2x slow reload." },
+        { name: "!blackout", desc: "Plunges arena into 8.0s pitch darkness (3.2-tile vision radius) and clears Light." },
+        { name: "!frenzy", desc: "Unleashes 8.0s Blood Frenzy (+60% mob speed/accel, non-stacking 8.0s cap) and clears Slow." }
+    ];
+
+    for (let i = 0; i < 5; i++) {
+        const iy = y + u * 0.85 + i * itemH;
+        const cmd = badCmds[i];
+
+        overlayContext.font = `bold ${Math.max(8.5, u * 0.42)}px ${fontDefault}`;
+        overlayContext.fillStyle = '#FF4D4D';
+        overlayContext.fillText(cmd.name, rx + u * 0.6, iy + u * 0.35);
+
+        overlayContext.font = `${Math.max(8.0, u * 0.38)}px ${fontDefault}`;
+        overlayContext.fillStyle = '#C8D1DC';
+        drawWrappedText(overlayContext, cmd.desc, rx + u * 3.6, iy, colW - u * 4.2, Math.max(8.5, u * 0.38), itemH - u * 0.05);
+    }
+
+    // 3. Bottom Section: Clutch Economy & Streamer Setup Cards
+    const botW = (w - u * 0.8) / 2;
+    const botH = h - cmdBoxH - u * 0.4;
+    const botY = y + cmdBoxH + u * 0.4;
+
+    // Bottom-Left Card: Clutch Economy & Divine Flash
+    overlayContext.fillStyle = 'rgba(22, 27, 34, 0.75)';
+    overlayContext.fillRect(x, botY, botW, botH);
+    overlayContext.strokeStyle = '#FBF236';
+    overlayContext.lineWidth = 1.5;
+    overlayContext.strokeRect(x, botY, botW, botH);
+
+    overlayContext.font = `bold ${Math.max(9.5, u * 0.46)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#FBF236';
+    overlayContext.fillText("CLUTCH ECONOMY & DIVINE FLASH", x + u * 0.6, botY + u * 0.55);
+
+    overlayContext.font = `${Math.max(8.0, u * 0.38)}px ${fontDefault}`;
     overlayContext.fillStyle = '#C8D1DC';
-    drawWrappedText(overlayContext, desc3, x + u * 0.8, y3 + u * 1.5, w - u * 1.6, u * 0.52, cardH - u * 1.6);
+    drawWrappedText(overlayContext, "CLUTCH AMMO FLOOR: Critical reserves (<3 Bullets, <2 Shells, <2 Rifle) trigger a 100% guaranteed scavenged drop on regular kills (1.0s / 60f multi-kill throttle). Emergency crate spawns after 4.0s (240f) if totally dry (0 chamber + 0 reserve).\nDIVINE FLASH: Casting !repair, !barrier, or !light at 1 HP with mobs within 6 tiles (or Karma ≥85%) triggers a holy shockwave: 2.5s invulnerability, vaporizes point-blank mobs, holy-stuns outer mobs/bosses for 3.0s, and forces ghosts solid (30s cooldown).", x + u * 0.6, botY + u * 0.95, botW - u * 1.2, Math.max(9.0, u * 0.40), botH - u * 1.1);
+
+    // Bottom-Right Card: Viewer Scaling & Streamer Setup
+    const botRx = x + botW + u * 0.8;
+    overlayContext.fillStyle = 'rgba(22, 27, 34, 0.75)';
+    overlayContext.fillRect(botRx, botY, botW, botH);
+    overlayContext.strokeStyle = '#9146FF';
+    overlayContext.lineWidth = 1.5;
+    overlayContext.strokeRect(botRx, botY, botW, botH);
+
+    overlayContext.font = `bold ${Math.max(9.5, u * 0.46)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#9146FF';
+    overlayContext.fillText("VIEWER SCALING & STREAMER SETUP", botRx + u * 0.6, botY + u * 0.55);
+
+    overlayContext.font = `${Math.max(8.0, u * 0.38)}px ${fontDefault}`;
+    overlayContext.fillStyle = '#C8D1DC';
+    drawWrappedText(overlayContext, "DYNAMIC VIEWER SCALING: Relay server adjusts charge gauges and cooldowns (4.0s !boss, 8.0s !blackout). Gauges: Solo (≤3) = 1 vote; Classroom (4–30) = 3–8 votes; Chaos (>30) = 5–15 votes.\nSTREAMER DASHBOARD: Press Cmd+D (Mac) or Ctrl+D (Win) / F1 to manage predictions, mock audience swarms, and channel settings.\nOBS CAPTURE: Zero overlays needed. Add Window Capture targeting 'Dead Again - Revamped (Twitch Edition)'.", botRx + u * 0.6, botY + u * 0.95, botW - u * 1.2, Math.max(9.0, u * 0.40), botH - u * 1.1);
 }
 
 // Tabbed In-Game Field Manual & Streamer Guide (D-11, D-12, D-17)
@@ -1004,6 +1058,30 @@ function renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH) {
     }
 
     overlayContext.restore();
+}
+
+// Field Manual Backward Compatibility Helpers (HELP-01..HELP-03, D-02)
+function renderFieldManualModal(W, H, cx, cy, u, safeW, safeH) {
+    renderStartScreenHelpManual(W, H, cx, cy, u, safeW, safeH);
+}
+
+function switchTab(newTab) {
+    if (typeof newTab === 'number' && newTab >= 0 && newTab <= 2) {
+        g_startHelpTab = newTab;
+    }
+}
+
+function drawTabButton(ctx, tx, tabY, tabW, tabH, title, isActive, u) {
+    if (!ctx) return;
+    ctx.fillStyle = isActive ? 'rgba(212, 175, 55, 0.22)' : 'rgba(22, 27, 34, 0.60)';
+    ctx.fillRect(tx, tabY - tabH / 2, tabW - 4, tabH);
+    ctx.strokeStyle = isActive ? '#FBF236' : 'rgba(212, 175, 55, 0.35)';
+    ctx.lineWidth = isActive ? 2.0 : 1.0;
+    ctx.strokeRect(tx, tabY - tabH / 2, tabW - 4, tabH);
+    ctx.font = `bold ${Math.max(10, u * 0.55)}px ${fontDefault}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = isActive ? '#FFFFFF' : '#B0B8C4';
+    ctx.fillText(title, tx + (tabW - 4) / 2, tabY);
 }
 
 // Theatrical Launch Sequence & Audio Triggers (D-14, D-15)
