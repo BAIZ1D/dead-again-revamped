@@ -654,36 +654,73 @@ function gameRenderPost() {
 
 			// Pause Card
 			const cardW = Math.min(W * 0.72, u * 26);
-			const cardH = H * 0.52;
+			const cardH = H * 0.64;
 			uiDrawRectScreen(vec2(cx, H * 0.5), vec2(cardW + 4, cardH + 4), colorWhite.scale(0.3));
 			uiDrawRectScreen(vec2(cx, H * 0.5), vec2(cardW, cardH), new Color(0.06, 0.06, 0.08, 0.95));
 
 			// Pause Header
-			drawTextWithOutline("GAME PAUSED", vec2(cx, H * 0.36), u * 1.6, colorBlood);
+			drawTextWithOutline("GAME PAUSED", vec2(cx, H * 0.35), u * 1.5, colorBlood);
 
 			// Resume Prompt / Button
-			const resumeY = H * 0.47;
-			drawTextWithOutline("[ RESUME ] (ESC / P)", vec2(cx, resumeY), u * 0.85, colorSpark);
+			const resumeY = H * 0.44;
+			drawTextWithOutline("[ RESUME ] (ESC / P)", vec2(cx, resumeY), u * 0.80, colorSpark);
 
 			// Survivor Field Manual Button (CLIP-06, D-08)
-			const manualY = H * 0.52;
+			const manualY = H * 0.50;
 			const mBtnW = Math.min(W * 0.55, u * 20);
 			const mBtnH = u * 1.8;
+			const btnW = mBtnW;
+			const btnH = mBtnH;
 			const mX = mousePosScreen ? mousePosScreen.x : (mousePos ? mousePos.x : 0);
 			const mY = mousePosScreen ? mousePosScreen.y : (mousePos ? mousePos.y : 0);
 			const manualHover = Math.abs(mX - cx) < mBtnW / 2 && Math.abs(mY - manualY) < mBtnH / 2;
 			uiDrawRectScreen(vec2(cx, manualY), vec2(mBtnW, mBtnH), manualHover ? colorBullet.scale(0.4) : colorWhite.scale(0.12));
 			drawTextWithOutline("[H] SURVIVOR FIELD MANUAL", vec2(cx, manualY), u * 0.75, manualHover ? colorSpark : colorWhite);
 			if (manualHover && mouseWasPressed(0)) {
+				uiSound(1);
 				g_startHelpOpen = true;
+			}
+
+			// Button 1: [C] CHEAT-SHEET: [ON / OFF] (D-23)
+			const csY = H * 0.56;
+			const csHover = Math.abs(mX - cx) < btnW / 2 && Math.abs(mY - csY) < btnH / 2;
+			uiDrawRectScreen(vec2(cx, csY), vec2(btnW, btnH), csHover ? colorBullet.scale(0.4) : colorWhite.scale(0.12));
+			const csStatus = (typeof g_cheatsheetVisible !== 'undefined' && g_cheatsheetVisible) ? "ON" : "OFF";
+			drawTextWithOutline(`[C] CHEAT-SHEET: [${csStatus}]`, vec2(cx, csY), u * 0.75, csHover ? colorSpark : (csStatus === "ON" ? colorZombie : colorGrey));
+			if (csHover && mouseWasPressed(0)) {
+				g_cheatsheetVisible = !g_cheatsheetVisible;
+				if (typeof safeSetPref === 'function') safeSetPref('da_cheatsheet_visible', g_cheatsheetVisible ? '1' : '0');
+				uiSound(1);
+			}
+
+			// Button 2: [DOCK: RIGHT / LEFT] (D-23)
+			const dockY = H * 0.62;
+			const dockHover = Math.abs(mX - cx) < btnW / 2 && Math.abs(mY - dockY) < btnH / 2;
+			uiDrawRectScreen(vec2(cx, dockY), vec2(btnW, btnH), dockHover ? colorBullet.scale(0.4) : colorWhite.scale(0.12));
+			const dockSide = (typeof g_cheatsheetDock !== 'undefined' ? g_cheatsheetDock : 'right').toUpperCase();
+			drawTextWithOutline(`[DOCK: ${dockSide}]`, vec2(cx, dockY), u * 0.75, dockHover ? colorSpark : colorWhite);
+			if (dockHover && mouseWasPressed(0)) {
+				g_cheatsheetDock = g_cheatsheetDock === 'right' ? 'left' : 'right';
+				if (typeof safeSetPref === 'function') safeSetPref('da_cheatsheet_dock', g_cheatsheetDock);
+				uiSound(1);
+			}
+
+			// Button 3: [ QUIT TO MAIN MENU ] (D-23, D-24)
+			const quitY = H * 0.68;
+			const quitHover = Math.abs(mX - cx) < btnW / 2 && Math.abs(mY - quitY) < btnH / 2;
+			uiDrawRectScreen(vec2(cx, quitY), vec2(btnW, btnH), quitHover ? colorBlood.scale(0.4) : colorWhite.scale(0.12));
+			drawTextWithOutline("[ QUIT TO MAIN MENU ]", vec2(cx, quitY), u * 0.75, quitHover ? colorSpark : colorBlood);
+			if (quitHover && mouseWasPressed(0)) {
+				uiSound(1);
+				if (typeof abandonRunToMainMenu === 'function') {
+					abandonRunToMainMenu();
+				}
 			}
 
 			// Desktop Streamer Dashboard Button (D-13)
 			const hasDesktopAPI = typeof window !== 'undefined' && (window.isDesktop || (window.electronAPI && window.electronAPI.openDashboard));
 			if (hasDesktopAPI) {
-				const dashY = H * 0.62;
-				const btnW = Math.min(W * 0.55, u * 20);
-				const btnH = u * 2.0;
+				const dashY = H * 0.74;
 
 				// Interactive button hover/click detection
 				const hovered = Math.abs(mX - cx) < btnW / 2 && Math.abs(mY - dashY) < btnH / 2;
@@ -692,6 +729,7 @@ function gameRenderPost() {
 				drawTextWithOutline("★ OPEN APG DASHBOARD (D) ★", vec2(cx, dashY), u * 0.75, hovered ? colorSpark : colorWhite);
 
 				if (hovered && mouseWasPressed(0)) {
+					uiSound(1);
 					if (window.electronAPI && window.electronAPI.openDashboard) {
 						window.electronAPI.openDashboard();
 					}
