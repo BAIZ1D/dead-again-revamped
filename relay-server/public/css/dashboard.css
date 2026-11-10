@@ -86,6 +86,22 @@
   transform: translateY(-1px);
 }
 
+.bmc-kofi-btn {
+  background: linear-gradient(135deg, #FF5E5B, #FFAA00) !important;
+  color: #ffffff !important;
+  border: 1px solid #ffcc00 !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px;
+  box-shadow: 0 0 10px rgba(255, 94, 91, 0.45);
+  transition: all 0.2s ease;
+}
+
+.bmc-kofi-btn:hover {
+  background: linear-gradient(135deg, #ff7572, #ffbb22) !important;
+  box-shadow: 0 0 16px rgba(255, 170, 0, 0.75), 0 0 8px rgba(255, 94, 91, 0.6);
+  transform: translateY(-1px);
+}
+
 .itch-btn {
   background: #FA5C5C;
   color: #ffffff !important;

@@ -324,7 +324,9 @@
 
     const ch = status.channel || 'none';
     channelBadge.textContent = `CHANNEL: #${ch}`;
-    viewerBadge.textContent = `VIEWERS: ${status.viewers ?? 0}`;
+    if (viewerBadge) {
+      viewerBadge.textContent = `VIEWERS: ${status.viewers ?? 0}`;
+    }
 
     if (status.hasHelixAuth) {
       authModeIndicator.textContent = 'Twitch Helix + IRC Mode (Authenticated)';
@@ -887,6 +889,16 @@
   if (btnSupportKofi) {
     btnSupportKofi.addEventListener('click', () => {
       openExternal('https://ko-fi.com/baiz1d');
+    });
+  }
+
+  const kofiHeaderBtn = document.getElementById('kofi-header-btn');
+  if (kofiHeaderBtn) {
+    kofiHeaderBtn.addEventListener('click', (e) => {
+      if (window.electronAPI && typeof window.electronAPI.openExternalUrl === 'function') {
+        e.preventDefault();
+        openExternal('https://ko-fi.com/baiz1d');
+      }
     });
   }
 
