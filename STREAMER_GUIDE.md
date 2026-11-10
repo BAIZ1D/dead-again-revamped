@@ -157,6 +157,14 @@ Audience commands are parsed locally by the relay engine and triggered in real t
 | `!blackout` | Team Bad | 5 seconds | Cuts arena illumination, creating hazardous visual conditions. |
 | `!frenzy` | Team Bad | 5 seconds | Enrages all existing zombies, increasing movement speed and aggression. |
 
+### In-Game Command Cheat-Sheet & Ergonomic Controls
+
+- **In-Game Cheat-Sheet Overlay (`[C]` / `[SELECT]`)**: Press **`[C]`** on keyboard or **`[SELECT]`** (Back) on gamepad at any time during combat or while paused to toggle the non-modal Twitch Chat Commands Cheat-Sheet card. When collapsed, the overlay renders 0 pixels on screen for 100% webcam and gameplay clearance.
+- **Docking Side Flip (`Shift+C` / Pause Menu)**: Press **`Shift+C`** or click **`[DOCK: RIGHT / LEFT]`** in the Pause Menu (`ESC` / `P`) to flip the cheat-sheet card between the Bottom-Right and Bottom-Left safe margins to accommodate your webcam layout. Both visibility and docking preferences are automatically saved across sessions.
+- **Ergonomic Run & Application Controls**:
+  - **`[ QUIT TO MAIN MENU ]`**: Available inside the in-game Pause Menu (`ESC` / `P`) to immediately abandon an active run and return cleanly to the title screen.
+  - **`[ EXIT GAME ]`**: Available on the Start Screen below `[H] HOW TO PLAY & GUIDE` to cleanly shut down the desktop application and background relay server.
+
 ---
 
 ## 8. Mock Dev Simulator (Offline Testing)

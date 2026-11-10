@@ -5582,6 +5582,7 @@ let g_startUserInteracted = false;
 let g_startWindTimer = 780; // 13s initial procedural wind cadence (720-960 frames, D-23)
 let g_startHoverCTA = false;
 let g_startHoverGuide = false;
+var g_startHoverExit = false;
 
 // Tab Pitch Multiplier Table for Compendium Navigation Chirps (D-24)
 const START_TAB_PITCH_RATES = [1.0, 1.12, 1.25];
@@ -6791,6 +6792,25 @@ function renderStartScreenBadges(cx, H, u, safeW) {
 
     drawTextWithOutline("[H] HOW TO PLAY & GUIDE", vec2(cx, guideY), Math.max(11, u * 0.62), colorSpark);
 
+    // 3b. Application Exit Button: "[ EXIT GAME ]" (D-25, D-26)
+    const exitY = H * 0.88;
+    const exitW = Math.min(safeW * 0.42, u * 12);
+    const exitH = u * 1.5;
+    const exitGlowAlpha = g_startHoverExit ? 0.85 : 0.45;
+
+    overlayContext.save();
+    overlayContext.fillStyle = 'rgba(22, 27, 34, 0.88)';
+    overlayContext.fillRect(cx - exitW / 2, exitY - exitH / 2, exitW, exitH);
+    overlayContext.strokeStyle = '#AC3232';
+    overlayContext.lineWidth = 1.2;
+    overlayContext.shadowColor = `rgba(172, 50, 50, ${exitGlowAlpha})`;
+    overlayContext.shadowBlur = g_startHoverExit ? 12 : 4;
+    overlayContext.strokeRect(cx - exitW / 2, exitY - exitH / 2, exitW, exitH);
+    overlayContext.shadowBlur = 0;
+    overlayContext.restore();
+
+    drawTextWithOutline("[ EXIT GAME ]", vec2(cx, exitY), Math.max(10, u * 0.54), g_startHoverExit ? colorSpark : colorBlood);
+
     // 4. OS-aware Streamer Dashboard Shortcut Bracket (D-08)
     const isMac = typeof navigator !== 'undefined' && (/Mac|iPhone|iPod|iPad/i.test(navigator.platform || '') || /Macintosh|Mac OS X/i.test(navigator.userAgent || ''));
     const keyHint = isMac ? "⌘+D" : "Ctrl+D";
@@ -7208,7 +7228,7 @@ function renderHelpTabStreamer(x, y, w, h, u) {
 
     overlayContext.font = `${Math.max(8.0, u * 0.38)}px ${fontDefault}`;
     overlayContext.fillStyle = '#C8D1DC';
-    drawWrappedText(overlayContext, "DYNAMIC VIEWER SCALING: Relay server adjusts charge gauges and cooldowns (4.0s !boss, 8.0s !blackout). Gauges: Solo (≤3) = 1 vote; Classroom (4–30) = 3–8 votes; Chaos (>30) = 5–15 votes.\nSTREAMER DASHBOARD: Press Cmd+D (Mac) or Ctrl+D (Win) / F1 to manage predictions, mock audience swarms, and channel settings.\nOBS CAPTURE: Zero overlays needed. Add Window Capture targeting 'Dead Again - Revamped (Twitch Edition)'.", botRx + u * 0.6, botY + u * 0.95, botW - u * 1.2, Math.max(9.0, u * 0.40), botH - u * 1.1);
+    drawWrappedText(overlayContext, "DYNAMIC VIEWER SCALING: Relay server adjusts charge gauges and cooldowns (4.0s !boss, 8.0s !blackout). Gauges: Solo (≤3) = 1 vote; Classroom (4–30) = 3–8 votes; Chaos (>30) = 5–15 votes.\nSTREAMER DASHBOARD: Press Cmd+D (Mac) or Ctrl+D (Win) / F1 to manage predictions, mock audience swarms, and channel settings.\nOBS CAPTURE: Zero overlays needed. Add Window Capture targeting 'Dead Again - Revamped (Twitch Edition)'.\nCHEAT-SHEET OVERLAY: Press [C] to toggle the in-game command cheat-sheet. Press Shift+C or use Pause Menu to flip docking side (Right / Left).", botRx + u * 0.6, botY + u * 0.95, botW - u * 1.2, Math.max(9.0, u * 0.40), botH - u * 1.1);
 }
 
 // Tabbed In-Game Field Manual & Streamer Guide (D-11, D-12, D-17, D-22)
@@ -7489,18 +7509,23 @@ function updateStartScreen() {
     const guideW = Math.min(safeW * 0.50, u * 15);
     const guideH = u * 1.7;
 
+    const exitY = H * 0.88;
+    const exitW = Math.min(safeW * 0.42, u * 12);
+    const exitH = u * 1.5;
+
     if (g_startMoonPulseFrames > 0) {
         g_startMoonPulseFrames--;
     }
 
-    // Hover state detection for CTA cartouche, [H] button, and Moon (D-26)
+    // Hover state detection for CTA cartouche, [H] button, [ EXIT GAME ], and Moon (D-25, D-26)
     const { moonX, moonY, moonR } = getStartMoonMetrics(W, H, u, safeW, safeH);
     if (mPos) {
         g_startHoverCTA = Math.abs(mPos.x - cx) < ctaW / 2 && Math.abs(mPos.y - ctaY) < ctaH / 2;
         g_startHoverGuide = Math.abs(mPos.x - cx) < guideW / 2 && Math.abs(mPos.y - guideY) < guideH / 2;
+        g_startHoverExit = Math.abs(mPos.x - cx) < exitW / 2 && Math.abs(mPos.y - exitY) < exitH / 2;
         const hoverMoon = Math.hypot(mPos.x - moonX, mPos.y - moonY) <= moonR * 1.35;
         if (mainCanvas && mainCanvas.style) {
-            if (g_startHoverCTA || g_startHoverGuide || hoverMoon) {
+            if (g_startHoverCTA || g_startHoverGuide || g_startHoverExit || hoverMoon) {
                 mainCanvas.style.cursor = 'pointer';
             } else {
                 mainCanvas.style.cursor = 'default';
@@ -7517,6 +7542,19 @@ function updateStartScreen() {
             const sPos = (typeof cameraPos !== 'undefined' && cameraPos) ? cameraPos : vec2(0, 0);
             if (typeof soundEnemyGroan !== 'undefined' && soundEnemyGroan && soundEnemyGroan.play) {
                 soundEnemyGroan.play(sPos, 0.35, 1.4);
+            }
+            return;
+        }
+        // Clicked Exit Game Button (D-25)
+        if (Math.abs(mPos.x - cx) < exitW / 2 && Math.abs(mPos.y - exitY) < exitH / 2) {
+            const sPos = (typeof cameraPos !== 'undefined' && cameraPos) ? cameraPos : vec2(0, 0);
+            if (typeof soundEnemyGroan !== 'undefined' && soundEnemyGroan && soundEnemyGroan.play) {
+                soundEnemyGroan.play(sPos, 0.35, 1.0);
+            }
+            if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.exitApp === 'function') {
+                window.electronAPI.exitApp();
+            } else if (typeof window !== 'undefined' && typeof window.close === 'function') {
+                window.close();
             }
             return;
         }
