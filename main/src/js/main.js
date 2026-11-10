@@ -288,16 +288,32 @@ function findFreePosRange(minDist, maxDist, requireLineOfSight = false) {
 
 var enemiesSpawned = 0;
 function spawnEnemy() {
-	var p = findFreePos(5);
-	let enemyClass = getNextEnemySpawnClass();
+	let isNightmare = typeof g_level !== "undefined" && g_level >= 5;
+	var p = findFreePos(isNightmare ? 8 : 5);
 
 	let enemy;
-	if (enemyClass == "v") {
-		enemy = new Vampire(p);
-	} else if (enemyClass == "g") {
-		enemy = new Ghost(p);
+	if (isNightmare) {
+		// D-13: Fully randomized 4-enemy spawn distribution from Wave 1
+		// 40% Zombies, 25% Vampires, 25% Ghosts, 10% Boss Zombies
+		let r = rand();
+		if (r < 0.40) {
+			enemy = new Zombie(p);
+		} else if (r < 0.65) {
+			enemy = new Vampire(p);
+		} else if (r < 0.90) {
+			enemy = new Ghost(p);
+		} else {
+			enemy = new BossZombie(p);
+		}
 	} else {
-		enemy = new Zombie(p);
+		let enemyClass = getNextEnemySpawnClass();
+		if (enemyClass == "v") {
+			enemy = new Vampire(p);
+		} else if (enemyClass == "g") {
+			enemy = new Ghost(p);
+		} else {
+			enemy = new Zombie(p);
+		}
 	}
 	g_enemies.push(enemy);
 	enemiesSpawned++;

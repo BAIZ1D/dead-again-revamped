@@ -53,6 +53,12 @@ const tileNumbers_door = 11;
 const DOOR_MAX_HP = 45;
 const WEAPON_DROP_COOLDOWN = 30; // 30 frames = 0.5s at 60fps
 
+// Nightmare horde scaling & boss concurrency caps (MODE-03, MODE-04, D-12, D-14)
+const BASE_NIGHTMARE_MOBS = 25;
+const MOB_SCALING_PER_WAVE = 3;
+const MAX_NIGHTMARE_MOBS = 40;
+const MAX_AUDIENCE_BOSSES = 5;
+
 // Reserve Ammo Caps (BAL-10, BAL-21, D-09)
 const MAX_AMMO_BULLETS = 36;
 const MAX_AMMO_SHELLS = 8; // Lowered from 12 to 8 (D-09)

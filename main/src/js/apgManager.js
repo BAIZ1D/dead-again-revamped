@@ -2,11 +2,17 @@
 
 function getMaxActiveMobs(lvl) {
 	const levelIdx = typeof lvl === "number" ? lvl : typeof g_level !== "undefined" ? g_level : 0;
+	if (levelIdx >= 5) {
+		let wave = levelIdx - 4; // 1-indexed nightmare wave
+		let base = typeof BASE_NIGHTMARE_MOBS !== "undefined" ? BASE_NIGHTMARE_MOBS : 25;
+		let scale = typeof MOB_SCALING_PER_WAVE !== "undefined" ? MOB_SCALING_PER_WAVE : 3;
+		let cap = typeof MAX_NIGHTMARE_MOBS !== "undefined" ? MAX_NIGHTMARE_MOBS : 40;
+		return Math.min(cap, base + (wave - 1) * scale);
+	}
 	const caps = [15, 18, 20, 23, 25];
 	return caps[clamp(levelIdx, 0, caps.length - 1)];
 }
-const MAX_ACTIVE_MOBS = 25;
-const MAX_AUDIENCE_BOSSES = 2;
+var MAX_ACTIVE_MOBS = 40;
 
 // Base Action Impact Weights for Contributor Scoring (D-21)
 const ACTION_IMPACT_WEIGHTS = {
@@ -520,15 +526,22 @@ class APGManager {
 							return e && e.isAudienceBoss && e.hp > 0;
 					  })
 					: [];
-			if (this.finalStand || livingBosses.length >= MAX_AUDIENCE_BOSSES) {
+			if (this.finalStand || livingBosses.length >= (typeof MAX_AUDIENCE_BOSSES !== "undefined" ? MAX_AUDIENCE_BOSSES : 5)) {
 				if (livingBosses.length > 0) {
-					let b = livingBosses[0];
-					b.maxHp = (b.maxHp || 16) + 4;
-					b.hp = min(b.maxHp, b.hp + 4);
-					b.enrageMult = min(1.4, (b.enrageMult || 1.0) * 1.15);
-					b.twitchUser = rawUser;
-					this.addWorldPopup("[BOSS ENRAGED +4 HP!]", b.pos.add(vec2(0, 1.2)), colorSpark);
-					this.addToast("[BAD] @" + tag + " empowered [Boss] @" + tag + "!", "bad");
+					for (let j = 0; j < livingBosses.length; j++) {
+						let b = livingBosses[j];
+						b.maxHp = (b.maxHp || 16) + 4;
+						b.hp = min(b.maxHp, b.hp + 4);
+						b._maxSpeed = (b._maxSpeed || 0.16) * 1.10;
+						b.enrageMult = min(1.8, (b.enrageMult || 1.0) * 1.10);
+						b.enrageStacks = (b.enrageStacks || 0) + 1;
+						b.enraged = true;
+					}
+					if (typeof applyGlobalBossEnrage === "function") {
+						applyGlobalBossEnrage();
+					}
+					this.addWorldPopup("[ALL BOSSES ENRAGED +4 HP!]", livingBosses[0].pos.add(vec2(0, 1.2)), colorSpark);
+					this.addToast("[BAD] @" + tag + " unleashed GLOBAL BOSS ENRAGE!", "bad");
 				} else {
 					this.enrageExistingHorde(rawUser);
 					this.addToast("[BAD] @" + tag + " enraged Final Stand monsters!", "bad");

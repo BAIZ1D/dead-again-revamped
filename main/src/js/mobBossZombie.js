@@ -36,10 +36,40 @@ class BossZombie extends Enemy {
 		this.soundTearing = soundBossTearing;
 
 		this.miniFace = miniTileNumbers_miniFaceBoss;
+
+		// Phase 23: 8-second wall tearing throttle (480 frames) and enrage tracking (D-14, D-15)
+		this.wallTearCooldown = 0;
+		this.enrageStacks = 0;
 	}
 
 	update() {
 		if (g_state == STATE_DEAD) return;
+
+		if (this.wallTearCooldown > 0) {
+			this.wallTearCooldown--;
+		}
+
+		// Bulldozer parting field: lateral outward impulse within 2.5 tiles (D-58)
+		if (typeof g_enemies !== "undefined" && g_enemies) {
+			for (let i = 0; i < g_enemies.length; i++) {
+				let m = g_enemies[i];
+				if (m && m !== this && !(m instanceof BossZombie) && m.hp > 0 && m.pos) {
+					let d = this.pos.distance(m.pos);
+					if (d < 2.5 && d > 0.01) {
+						let moveDir = this.velocity && (this.velocity.x || this.velocity.y) ? this.velocity.normalize() : vec2(0, 1);
+						let perp = vec2(-moveDir.y, moveDir.x);
+						let toMinion = m.pos.subtract(this.pos);
+						let side = toMinion.dot(perp) >= 0 ? 1 : -1;
+						let impulse = perp.scale(side * 0.12 * (1 - d / 2.5));
+						if (typeof m.applyForce === "function") {
+							m.applyForce(impulse);
+						} else if (m.velocity) {
+							m.velocity = m.velocity.add(impulse);
+						}
+					}
+				}
+			}
+		}
 
 		// portal telegraph / Divine Flash stun pause all boulder behaviour (D-07, D-15)
 		if (this.spawnTelegraphFrames > 0 || this.stunFrames > 0) {
@@ -84,6 +114,13 @@ class BossZombie extends Enemy {
 	}
 
 	postRender() {
+		// Enrage aura (D-14)
+		if (this.enrageStacks > 0 || this.enraged) {
+			let curFrame = typeof frame !== "undefined" ? frame : 0;
+			let auraAlpha = 0.35 + 0.15 * Math.sin(curFrame / 6);
+			drawRect(this.pos, this.size.scale(1.25), new Color(1, 0, 0, auraAlpha));
+		}
+
 		// draw face
 		let lookRight = typeof g_player !== "undefined" && g_player ? g_player.pos.subtract(this.pos).x > -1 : false;
 		drawTile(
@@ -100,25 +137,41 @@ class BossZombie extends Enemy {
 	}
 
 	collideWithTile(tileData, pos) {
-		if (this.tearing) return;
+		if (this.tearing) return true;
 		// no wall tearing while frozen in a spawn portal or holy-stunned (D-07, D-15)
 		if (this.spawnTelegraphFrames > 0 || this.stunFrames > 0) return true;
 
+		// 8-second wall tearing throttle (480 frames) per D-15
+		if (this.wallTearCooldown > 0) return true;
+
+		// Perimeter boundary walls are strictly immune to boss tearing per D-15
+		let mapW = typeof tileLayer !== "undefined" && tileLayer ? tileLayer.size.x : (typeof mapData !== "undefined" && typeof g_levelDef !== "undefined" && mapData[g_levelDef.map] ? mapData[g_levelDef.map].w : 100);
+		let mapH = typeof tileLayer !== "undefined" && tileLayer ? tileLayer.size.y : (typeof mapData !== "undefined" && typeof g_levelDef !== "undefined" && mapData[g_levelDef.map] ? mapData[g_levelDef.map].h : 100);
+		if (pos.x <= 0 || pos.y <= 0 || pos.x >= mapW - 1 || pos.y >= mapH - 1) {
+			return true;
+		}
+
 		// tearing out a door counts as breaking it, keep the registry in sync (D-02)
 		if (tileData == tileNumbers_door) {
-			let door = g_doors[pos.x + "_" + pos.y];
+			let idx = Math.floor(pos.x) + "_" + Math.floor(pos.y);
+			let door = typeof g_doors !== "undefined" ? g_doors[idx] : null;
 			if (door) {
 				door.hp = 0;
 				door.broken = true;
 			}
 		}
 
-		if (pos.x > 0 && pos.y > 0 && pos.x < tileLayer.size.x - 1 && pos.y < tileLayer.size.y - 1) {
-			tileLayer.setData(pos, 0, true);
-			setTileCollisionData(pos, 0);
+		if (pos.x > 0 && pos.y > 0 && pos.x < mapW - 1 && pos.y < mapH - 1) {
+			if (typeof tileLayer !== "undefined" && tileLayer) {
+				tileLayer.setData(pos, 0, true);
+			}
+			if (typeof setTileCollisionData === "function") {
+				setTileCollisionData(pos, 0);
+			}
 		}
 
 		this.tearing = true;
+		this.wallTearCooldown = 480; // 8-second throttle (480 frames at 60 FPS) per D-15
 		this.soundTearing.play(this.pos);
 
 		// tear out chunk
@@ -127,5 +180,42 @@ class BossZombie extends Enemy {
 		this.tearingTimer = new Timer(1);
 
 		return true;
+	}
+}
+
+/**
+ * Returns active living boss count in current room (D-14).
+ */
+function getActiveBossCount() {
+	if (typeof g_enemies === "undefined" || !g_enemies) return 0;
+	let count = 0;
+	for (let i = 0; i < g_enemies.length; i++) {
+		if (g_enemies[i] instanceof BossZombie && g_enemies[i].hp > 0) {
+			count++;
+		}
+	}
+	return count;
+}
+
+/**
+ * Applies global boss enrage to all living active bosses when boss cap is reached (D-14).
+ */
+function applyGlobalBossEnrage() {
+	if (typeof g_enemies === "undefined" || !g_enemies) return;
+	for (let i = 0; i < g_enemies.length; i++) {
+		let b = g_enemies[i];
+		if (b instanceof BossZombie && b.hp > 0) {
+			b.hp += 4;
+			b.maxHp = (b.maxHp || b.hp) + 4;
+			b._maxSpeed = (b._maxSpeed || 0.16) * 1.10;
+			b.enrageStacks = (b.enrageStacks || 0) + 1;
+			b.enraged = true;
+			if (typeof fx_shakeScreen === "function") {
+				fx_shakeScreen(0.4);
+			}
+		}
+	}
+	if (typeof soundBossRoar !== "undefined" && soundBossRoar && soundBossRoar.play) {
+		soundBossRoar.play();
 	}
 }

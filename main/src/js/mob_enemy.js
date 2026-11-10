@@ -95,6 +95,38 @@ class Enemy extends Mob {
 		this._maxSpeed = this._baseMaxSpeed * speedMult;
 		this.enemyAccel = accelSign * this._customBaseAccel * accelMult;
 
+		// Anti-Stall Nudge (D-57): Track mob displacement over 240 frames (4s).
+		// If displacement < 0.2 tiles while in pursuit, inject orthogonal nudge toward open corridor.
+		if (!this.antiStallStartPos || !this.antiStallTimer) {
+			this.antiStallStartPos = this.pos.copy();
+			this.antiStallTimer = 240;
+		} else {
+			this.antiStallTimer--;
+			if (this.antiStallTimer <= 0) {
+				let distMoved = this.pos.distance(this.antiStallStartPos);
+				if (distMoved < 0.2 && this.enemyToTarget && this.enemyToTarget.length() > 1.0) {
+					let targetDir = this.enemyToTarget.normalize();
+					let perp = (rand() < 0.5 ? 1 : -1);
+					let nudge = vec2(-targetDir.y * perp, targetDir.x * perp).scale(0.18);
+					this.applyForce(nudge);
+				}
+				this.antiStallStartPos = this.pos.copy();
+				this.antiStallTimer = 240;
+			}
+		}
+
+		// Doorway Force-Fields (D-56): Detect if within 2.0 tiles of any door opening
+		this.nearDoor = false;
+		if (typeof g_doors !== "undefined" && g_doors) {
+			for (let key in g_doors) {
+				let d = g_doors[key];
+				if (d && this.pos.distance(vec2(d.x + 0.5, d.y + 0.5)) <= 2.0) {
+					this.nearDoor = true;
+					break;
+				}
+			}
+		}
+
 		// think and look
 		if (this.enemyThinkPause-- <= 0) {
 			if (typeof g_player !== "undefined" && g_player) {
@@ -109,7 +141,10 @@ class Enemy extends Mob {
 		// take a step
 		if (rand() < 0.1) {
 			let force = vec2(0);
-			if (this.enemyToTarget) force = this.enemyToTarget.normalize(this.enemyAccel);
+			if (this.enemyToTarget) {
+				let jitterMult = this.nearDoor ? (1 + (rand() - 0.5) * 0.3) : 1; // +/-15% forward velocity jitter per D-56
+				force = this.enemyToTarget.normalize(this.enemyAccel * jitterMult);
+			}
 
 			let jitter = randInCircle(this.enemyJitterForce);
 			force = force.add(jitter);
@@ -124,13 +159,35 @@ class Enemy extends Mob {
 	}
 
 	collideWithTile(tileData, tilePos) {
-		// Stuck-door anti-softlock bash (D-03): after ~3s pressed against a door, smash it open
 		if (tileData == tileNumbers_door) {
-			this.doorStuckFrames = (this.doorStuckFrames || 0) + 1;
-			if (this.doorStuckFrames > 180) {
-				breakDoorAt(tilePos.x, tilePos.y, true);
-				this.doorStuckFrames = 0;
+			if (this instanceof Ghost || this.tileIndex == tileNumbers_ghost) {
+				// Ghosts phase through closed barricade doors unhindered (D-47)
 				return false;
+			}
+			let idx = Math.floor(tilePos.x) + "_" + Math.floor(tilePos.y);
+			let door = typeof g_doors !== "undefined" ? g_doors[idx] : null;
+			if (door && !door.broken) {
+				this.doorBashTimer = (this.doorBashTimer || 0) + 1;
+				// Throttled bash attack: normal mobs deal 2 HP/sec (deals 1 damage every 30 frames)
+				// Bosses deal 15 damage per hit (D-44)
+				let bashInterval = this instanceof BossZombie ? 60 : 30;
+				if (this.doorBashTimer >= bashInterval) {
+					this.doorBashTimer = 0;
+					let dmg = this instanceof BossZombie ? 15 : 1;
+					door.hp -= dmg;
+					if (typeof spawnSplinterParticles === "function") {
+						spawnSplinterParticles(door.x, door.y, 2);
+					}
+					if (typeof soundDoorBash !== "undefined" && soundDoorBash && soundDoorBash.play) {
+						soundDoorBash.play(vec2(door.x, door.y));
+					} else if (typeof soundBoulderDestroy !== "undefined" && soundBoulderDestroy && soundBoulderDestroy.play) {
+						soundBoulderDestroy.play(vec2(door.x, door.y), 0.8);
+					}
+					if (door.hp <= 0.05) {
+						breakDoorAt(door.x, door.y, true);
+					}
+				}
+				return true;
 			}
 		}
 
@@ -148,11 +205,13 @@ class Enemy extends Mob {
 
 	collideWithObject(o) {
 		if (o instanceof Enemy) {
-			const TOO_CLOSE = 0.7;
+			// Doorway Force-Fields (D-56): +50% lateral repulsion near doorways (1.05 vs 0.7)
+			const TOO_CLOSE = (this.nearDoor || o.nearDoor) ? 1.05 : 0.7;
 
 			let toOther = o.pos.subtract(this.pos);
 			if (toOther.length() < TOO_CLOSE) {
-				let pushForce = toOther.normalize(rand(0.1) / (toOther.length() + 0.001));
+				let mult = (this.nearDoor || o.nearDoor) ? 1.5 : 1.0;
+				let pushForce = toOther.normalize((rand(0.1) * mult) / (toOther.length() + 0.001));
 				o.applyForce(pushForce);
 				this.groan(0.1, 0.9, 1);
 			}
@@ -201,12 +260,14 @@ class Enemy extends Mob {
 			}
 
 			if (this instanceof BossZombie) {
-				if (this.isAudienceBoss) {
-					// D-08: Audience Mini-Boss does NOT end the level or wipe other enemies!
-					g_score += 4; // +4 here + 1 below = +5 bonus score
+				let isNightmare = typeof g_level !== "undefined" && g_level >= 5;
+				if (this.isAudienceBoss || isNightmare) {
+					// D-08, D-14, D-20: Defeating any boss in Nightmare drops Full Care Package
+					g_score += 4;
 					let gunTile = g_player && g_player.gun ? g_player.gun.tileIndex : tileNumbers_pistol;
-					// D-05: Mini-boss drops Full Care Package (isFullPackage = true)
-					new AmmoBox(this.pos.copy(), gunTile, this.twitchUser, false, true);
+					// Radial scatter deconfliction (1.5-2.0 tile search) so multiple crates never overlap (D-23)
+					let dropPos = typeof findScatterDropPos === "function" ? findScatterDropPos(this.pos) : this.pos.copy();
+					new AmmoBox(dropPos, gunTile, this.twitchUser || "NightmareBoss", false, true);
 					if (typeof g_apgManager !== "undefined" && g_apgManager) {
 						g_apgManager.onEnemyKilled(this);
 					}
@@ -298,4 +359,16 @@ class Enemy extends Mob {
 		pos = this.pos.add(vec2(-chestWidth, chestHeight));
 		drawLine(pos, pos.add(pointing), 1.2 / 12, this._armColor, !!glEnable);
 	}
+}
+
+/**
+ * Returns dynamic concurrency scaling cap (25 to 40 entities) for Nightmare waveNum (D-12).
+ * Wave 1: 25, Wave 2: 28, Wave 3: 31, Wave 4: 34, Wave 5: 37, Wave 6+: 40
+ */
+function getMaxMobsForWave(waveNum) {
+	let w = typeof waveNum === "number" ? waveNum : 1;
+	let base = typeof BASE_NIGHTMARE_MOBS !== "undefined" ? BASE_NIGHTMARE_MOBS : 25;
+	let scale = typeof MOB_SCALING_PER_WAVE !== "undefined" ? MOB_SCALING_PER_WAVE : 3;
+	let cap = typeof MAX_NIGHTMARE_MOBS !== "undefined" ? MAX_NIGHTMARE_MOBS : 40;
+	return Math.min(cap, base + (w - 1) * scale);
 }
