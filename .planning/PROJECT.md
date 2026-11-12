@@ -82,29 +82,31 @@ A high-stakes, real-time tug-of-war between streamer survival and audience sabot
 - **VIS-01: Start Screen Retro Arcade Visual Overhaul:** Created `startScreen.js` (1046 lines) featuring procedural Canvas 2D heraldic crest with crossed Shotgun and SMG tiles at $\pm 35^\circ$ with specular glints; floating Survivor vs Zombie portraits with divine (`#FBF236`) and miasma (`#AC3232`) auras; 24 rising embers; CRT scanlines; multi-pass chromatic glows on "DEAD AGAIN"; 4-second specular sheen sweep; pulsating arcade CTA cartouche; in-game 3-tab Field Manual modal (`[H]`); unified multi-input controls; and 12-frame CRT phosphor flash wipe transition.
 - **PKG-08: Release v1.2.0 Packaging & Meta-Verification:** Synchronized semantic version `1.2.0` across root `package.json`, `package-lock.json`, `relay-server/package.json`, `desktop/updater.js`, and `desktop/menu.js`; synchronized `README.md`; compiled clean 30-module production bundle `dist/js/index.js` (235.2 KB) with zero ES6 leakage; and passed all 7 regression test suites 100% green via `npm run test:phase18` in 7.80s.
 
+### Milestone v1.6: UI Clipping Fixes, Retro Visuals & Endless Nightmare Mode (Release v1.3.0) (Shipped 2026-11-10)
+
+- **CLIP-04, CLIP-05, CLIP-06: HUD Ergonomics & Word-Wrapping Engine:** Re-anchored top-left equipment card with guaranteed $\ge 0.25 \cdot scaleUI$ left clearance, dynamic vote lock banner sizing, and universal multi-line `drawWrappedText` Canvas 2D engine with pause-screen Field Manual access (`[H]`).
+- **HELP-01, HELP-02, HELP-03: Field Manual Compendium Completion:** Filled Tab 1 (Weapons) with verified telemetry and Hunting Rifle single-round correction, Tab 2 (Bestiary) with dossiers for all 4 enemy archetypes and boss mechanics, and Tab 3 (Twitch APG) with chat command rules and clutch thresholds.
+- **VIS-02, VIS-03, VIS-04: 16-Bit Retro Arcade Start Screen Visuals:** Procedural 3-plane gothic graveyard silhouette with scooped U-profile horizon dip (24% center, 40% flanks), cratered Bayer 4x4 dithered harvest/blood moon with audio easter egg on click, and 3-layer parallax drifting pixel fog at 60 FPS without external images.
+- **HUD-05, HUD-06: In-Game Stream Command Cheat-Sheet:** Non-modal bottom-right chat commands cheat-sheet card (`[C]`/gamepad) with real-time 45-frame command pulses and 30-frame event flares, Start Screen `[ EXIT GAME ]` button, Electron IPC app exit, and dashboard monetization CTA.
+- **MODE-01..MODE-05: Endless Multi-Room Nightmare Survival Gauntlet:** Post-Level 5 endless survival mode with 15s prediction lobbies, repeating dungeon layouts (Maps 0, 1, 3, 4, 2) with destructible barricade doors (45 HP), starting armory room with weapon pedestals, up to 40 concurrent mobs and 5 concurrent audience bosses with enrage buffs, full care packages, dynamic music tempo (+2 BPM/wave), wave micro-purges, and persistent high scores in `localStorage`.
+- **PKG-09, PKG-10: Release v1.3.0 Packaging & Meta-Verification:** Symmetrical in-game `[C] CREDITS` modal honoring creators with zero legalese, semantic version 1.3.0 synchronization across manifests and desktop updater/menu, `README.md` and `STREAMER_GUIDE.md` showcases, production compilation audit (30 files, 370KB, 0 unbundled ES6 statements), and 100% green pass across all 12 regression test suites via `scripts/test-phase24.js`.
+
 ---
 
 ## Current State
 
-- **Version:** v1.2.0 (Shipped)
+- **Version:** v1.3.0 (Shipped)
 - **Repository:** Unified single repo `BAIZ1D/dead-again-revamped`
 - **License:** GNU Affero General Public License v3.0 (AGPL-3.0)
-- **Test Status:** 100% green across all 12 test suites (Phase 23, 22, 21, 20, 19, 18, 17, 16, 15, 13, 12, Packaging, Distribution) including 7-viewport multi-resolution Canvas 2D VM verification and full regression suite.
-- **Milestones Completed:** v1.0, v1.1, v1.2, v1.3, v1.4, v1.5 (Phases 19, 20, 21, 22, 23 of v1.6 complete).
+- **Test Status:** 100% green pass across all 13 verification test suites via `npm run test:phase24` (Phases 9, 12, 13, 15, 16, 17, 19, 20, 21, 22, 23, 24).
+- **Milestones Completed:** v1.0, v1.1, v1.2, v1.3, v1.4, v1.5, v1.6 (Phases 1–24 all complete).
 
-## Current Milestone: v1.6 UI Clipping Fixes, Retro Visuals & Endless Nightmare Mode (Release v1.3.0)
+## Next Milestone Goals (v2.0+)
 
-**Goal:** Eliminate HUD clipping defects, revamp the start screen into authentic 16-bit pixel aesthetics, provide on-screen Twitch command guidance for viewers, and deliver an endless multi-room Nightmare survival mode with escalating mob waves and up to 5 concurrent bosses.
-
-**Target features:**
-- Re-anchor top-left health bar (hearts and shield) snuggly under avatar portrait without left-edge clipping
-- Deconflict vote lock announcement banners to prevent text overflowing banner boundaries
-- Fix text wrapping and bounding box overflow across all Field Manual / Help tabs
-- Populate Field Manual with complete weapon stats (Pistol, Shotgun, Rifle, SMG) and mob compendium (Zombies, Vampires, Ghosts, Bosses)
-- Overhaul start screen into 16-bit retro arcade pixel aesthetic with animated fog, pixel moon, and graveyard skyline
-- Add stream-friendly Twitch chat commands cheat-sheet overlay docked in safe margin (bottom-right)
-- Implement post-Level 5 endless multi-room Nightmare dungeon with starting weapon spawns, escalating all-enemy waves, 5-boss audience cap, and high score survival tracking
-- Release packaging synchronization to v1.3.0 with complete test suite verification
+Potential focus areas for future milestone exploration:
+- **MODE-06: Infinite Procedural BSP Caverns:** Fully random procedural room-and-corridor generator generating novel layouts per wave.
+- **AUD-01: Custom Twitch Channel Point Boss Customization:** Viewers redeem channel points to customize spawned boss sprite tints, names, and elite affix traits.
+- **NET-01: Streamer Tournament Co-Op:** Multi-streamer co-op survival over peer-to-peer WebRTC.
 
 ## Requirements
 
@@ -121,17 +123,11 @@ A high-stakes, real-time tug-of-war between streamer survival and audience sabot
 - VIS-02, VIS-03, VIS-04 16-Bit Retro Arcade Start Screen Visual Overhaul (3/3) -- Phase 21 (v1.6)
 - HUD-05, HUD-06 In-Game Stream Command Cheat-Sheet & Streamer Ergonomics (2/2) -- Phase 22 (v1.6)
 - MODE-01, MODE-02, MODE-03, MODE-04, MODE-05 Endless Multi-Room Nightmare Survival Gauntlet (5/5) -- Phase 23 (v1.6)
+- PKG-09, PKG-10 Release v1.3.0 Packaging & Verification (2/2) -- Phase 24 (v1.6)
 
 ### Active
 
-- [x] Top-left health bar (hearts and shield) snug beneath avatar portrait with zero left-edge screen clipping (`CLIP-04` -- Phase 19)
-- [x] Post-vote locked notification banner text strictly contained within banner bounding box (`CLIP-05` -- Phase 19)
-- [x] Field manual / Help modal text layout and wrapping across all tabs contained within bounds (`CLIP-06` -- Phase 19)
-- [x] Complete arsenal and bestiary documented in Help tabs (all 4 guns and all enemy types) (`HELP-01..03` -- Phase 20)
-- [x] 16-bit retro pixel art start screen backdrop and title treatment matching core game aesthetic (`VIS-02..04` -- Phase 21)
-- [x] In-game stream-visible Good/Bad chat commands cheat-sheet overlay positioned in bottom-right margin with hotkey toggle (`HUD-05..06` -- Phase 22)
-- [x] Endless multi-room Nightmare Level progression after Level 5 with all weapons scattered in starting rooms, escalating waves, 5-boss audience cap, and survival scoring (`MODE-01..05` -- Phase 23)
-- [ ] Semantic version v1.3.0 bump across manifests and full test suite verification (`PKG-09..10` -- Phase 24)
+All milestone requirements completed. Run `/gsd-new-milestone` to define new requirements.
 
 ### Out of Scope
 
@@ -165,4 +161,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-10 after Phase 22 completion (Milestone v1.6)*
+*Last updated: 2026-11-12 upon Milestone v1.6 completion*

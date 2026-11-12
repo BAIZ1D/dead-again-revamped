@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Packaging & Verification
 status: complete
-last_updated: "2026-11-10T13:49:00.000Z"
-last_activity: 2026-11-10
+last_updated: "2026-11-12T09:07:00.000Z"
+last_activity: 2026-11-12
 progress:
   total_phases: 6
   completed_phases: 6
@@ -17,31 +17,35 @@ progress:
 
 ## Project Reference
 
-See: `.planning/PROJECT.md` (updated 2026-11-10 after v1.6 initiation)  
-See: `.planning/ROADMAP.md` (created 2026-11-10)  
-See: `.planning/REQUIREMENTS.md` (traceability mapped 2026-11-10)  
+See: `.planning/PROJECT.md` (updated 2026-11-12 after v1.6 completion)  
+See: `.planning/ROADMAP.md` (updated 2026-11-12)  
+See: `.planning/milestones/v1.6-REQUIREMENTS.md` (archived 2026-11-12)  
 
 **Core value:** A high-stakes, real-time tug-of-war between streamer survival and audience sabotage powered by native Twitch Channel Point predictions and dynamic in-game audience events--with zero external stream overlays required.  
-**Current focus:** Milestone v1.6 complete — Phase 24 Shipped
+**Current focus:** Milestone v1.6 archived — Ready for next milestone
 
 ## Current Position
 
-Phase: 24 (release-v1-3-0-packaging-verification) — COMPLETE
+Phase: 24 (release-v1-3-0-packaging-verification) — ARCHIVED
 Plan: 2 of 2
-Status: Phase 24 fully executed and verified (100% green pass across all 12 regression test suites)
-Last activity: 2026-11-10
-Context gathered: .planning/phases/24-release-v1-3-0-packaging-verification/24-CONTEXT.md
+Status: Milestone v1.6 complete, verified, and archived
+Last activity: 2026-11-12
 
-## Active Milestone: v1.6 (Release v1.3.0)
+## Active Milestone
 
-- [x] **Phase 19: HUD Ergonomics, Banner Containment & Field Manual Text-Wrapping Engine** (CLIP-04, CLIP-05, CLIP-06)
-- [x] **Phase 20: Field Manual Arsenal & Bestiary Compendium Completion** (HELP-01, HELP-02, HELP-03)
-- [x] **Phase 21: 16-Bit Retro Arcade Start Screen Visual Overhaul** (VIS-02, VIS-03, VIS-04)
-- [x] **Phase 22: In-Game Stream Command Cheat-Sheet & Streamer Ergonomics** (HUD-05, HUD-06)
-- [x] **Phase 23: Endless Multi-Room Nightmare Survival Gauntlet** (MODE-01, MODE-02, MODE-03, MODE-04, MODE-05)
-- [x] **Phase 24: Release v1.3.0 Packaging & Verification** (PKG-09, PKG-10)
+None (Milestone v1.6 archived. Run `/gsd-new-milestone` to start next milestone).
 
 ## Completed Milestones
+
+### Milestone v1.6: UI Clipping Fixes, Retro Visuals & Endless Nightmare Mode (Release v1.3.0) (17/17)
+
+- [x] Phase 19: HUD Ergonomics, Banner Containment & Field Manual Text-Wrapping Engine (3/3 plans)
+- [x] Phase 20: Field Manual Arsenal & Bestiary Compendium Completion (2/2 plans)
+- [x] Phase 21: 16-Bit Retro Arcade Start Screen Visual Overhaul (2/2 plans)
+- [x] Phase 22: In-Game Stream Command Cheat-Sheet & Streamer Ergonomics (3/3 plans)
+- [x] Phase 23: Endless Multi-Room Nightmare Survival Gauntlet (5/5 plans)
+- [x] Phase 24: Release v1.3.0 Packaging & Verification (2/2 plans)
+- See: `.planning/milestones/v1.6-ROADMAP.md` and `.planning/milestones/v1.6-REQUIREMENTS.md`
 
 ### Milestone v1.5: UI Polish, Combat Balance & Visual Overhaul (Release v1.2.0) (7/7)
 
